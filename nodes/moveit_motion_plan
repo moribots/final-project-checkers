@@ -1,0 +1,476 @@
+#!/usr/bin/env python
+""" REFERENCE: https://github.com/ros-planning/moveit_tutorials/blob/master/doc/move_group_python_interface/scripts/move_group_python_interface_tutorial.py
+"""
+
+import sys
+import copy
+import rospy
+import moveit_commander
+import moveit_msgs.msg
+import geometry_msgs.msg
+from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
+import numpy as np
+from std_msgs.msg import String, Bool
+from moveit_commander.conversions import pose_to_list
+import baxter_interface
+from baxter_interface import Gripper, CHECK_VERSION
+from sensor_msgs.msg import Range
+import tf.transformations as tr
+
+
+class PickPlace():
+    def __init__(self):
+        rospy.loginfo("Initializing Baxter")
+
+        # Initialize moveit_commander with kin model
+        # and current joint states
+        self.robot = moveit_commander.RobotCommander()
+        # Remote interface for getting, setting and updating
+        # robot's belief of surroundings
+        self.scene = moveit_commander.PlanningSceneInterface()
+        # Interface used to execute motions
+        self.right_arm_group = moveit_commander.MoveGroupCommander("right_arm")
+
+        # Display Trajectory in RVIZ
+        self.display_trajectory_publisher = rospy.Publisher(
+            '/move_group/display_planned_path',
+            moveit_msgs.msg.DisplayTrajectory,
+            queue_size=20)
+
+        self.moving_publisher = rospy.Publisher('amimoving',
+                                                String,
+                                                queue_size=10)
+        rospy.sleep(3.0)
+        # print self.robot.get_current_state()
+        # print ""
+
+        # Getting Basic Information
+
+        # Get robot reference frame name
+        self.planning_frame = self.right_arm_group.get_planning_frame()
+        rospy.loginfo("========== Reference frame: %s" % self.planning_frame)
+        # Get End Effector link name for this group
+        self.eef_link = self.right_arm_group.get_end_effector_link()
+        rospy.loginfo("========== End effector: %s" % self.eef_link)
+        # Get list of all groups in the robot
+        self.group_names = self.robot.get_group_names()
+        rospy.loginfo("========== Robot Groups:", self.robot.get_group_names())
+
+        # DEBUG: Print Robot State
+        self.robot_state = self.robot.get_current_state()
+
+        # Planning and Execurtion parameters
+        self.right_arm_group.set_goal_position_tolerance(0.01)
+        self.right_arm_group.set_goal_orientation_tolerance(0.01)
+        self.right_arm_group.set_planning_time(5.0)
+        self.right_arm_group.allow_replanning(False)
+        self.right_arm_group.set_max_velocity_scaling_factor(0.6)
+        self.right_arm_group.set_max_acceleration_scaling_factor(0.6)
+
+        # State Gripper (L/R)
+        self.right_gripper = Gripper('right', CHECK_VERSION)
+        # Reboot Gripper
+        self.right_gripper.reboot()
+        # Calibrate Gripper
+        self.right_gripper.calibrate()
+        # Open Gripper
+        self.right_gripper.open()
+
+        # self.limb = baxter_interface.Limb('right')
+        # self.angles = self.limb.joint_angles()
+        # self.wave_1 = {'right_s0': -0.459, 'right_s1': -0.202, 'right_e0': 1.807, 'right_e1': 1.714, 'right_w0': -0.906, 'right_w1': -1.545, 'right_w2': -0.276}
+        # rospy.sleep(3)
+        # self.limb.move_to_joint_positions(self.wave_1)
+
+        # Initialise attribute for desired EE Pose
+        self.pose_goal = Pose()
+        # Amount to pull back pre and post grip (approach, retreat)
+        self.standoff = 0.1
+
+        # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+
+        self.moving = '0'
+        self.moving_publisher.publish(self.moving)
+
+    def add_box(self, timeout=4):
+        """
+        """
+        box_name = self.box_name
+        scene = self.scene
+
+        # Add Objects to Planning Scene
+        self.box_name = 'table'
+        self.box_pose = PoseStamped()
+        # Can reference to base frame
+        # Or can reference to EE finger frame
+        # for grasping
+        self.box_pose.header.frame_id = "base"
+        self.box_pose.pose.position.x = 1.0
+        self.box_pose.pose.position.z = -0.27
+        self.box_pose.pose.orientation.w = 1.0
+        self.scene.add_box(self.box_name, self.box_pose, size=(1.5, 2, 0.1))
+
+        self.box_name = box_name
+        return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+
+    def attach_box(self, timeout=4):
+        box_name = self.box_name
+        robot = self.robot
+        scene = self.scene
+        eef_link = self.eef_link
+        group_names = self.group_names
+        # Next, we will attach the box to the Panda wrist. Manipulating objects requires the
+        # robot be able to touch them without the planning scene reporting the contact as a
+        # collision. By adding link names to the ``touch_links`` array, we are telling the
+        # planning scene to ignore collisions between those links and the box. For the Panda
+        # robot, we set ``grasping_group = 'hand'``. If you are using a different robot,
+        # you should change this value to the name of your end effector group name.
+        grasping_group = 'hand'
+        touch_links = robot.get_link_names(group=grasping_group)
+        scene.attach_box(eef_link, box_name, touch_links=touch_links)
+        # We wait for the planning scene to update.
+        return self.wait_for_state_update(box_is_attached=True, box_is_known=False, timeout=timeout)
+
+    def detach_box(self, timeout=4):
+        box_name = self.box_name
+        scene = self.scene
+        eef_link = self.eef_link
+        # Detaching Objects from the Robot
+        # We can also detach and remove the object from the planning scene:
+        scene.remove_attached_object(eef_link, name=box_name)
+        # We wait for the planning scene to update.
+        return self.wait_for_state_update(box_is_known=True, box_is_attached=False, timeout=timeout)
+
+    def remove_box(self, timeout=4):
+        box_name = self.box_name
+        scene = self.scene
+        # We can remove the box from the world.
+        scene.remove_world_object(box_name)
+        # **Note:** The object must be detached before we can remove it from the world
+        # We wait for the planning scene to update.
+        return self.wait_for_state_update(box_is_attached=False, box_is_known=False, timeout=timeout)
+
+    def wait_for_state_update(self, box_is_known=False, box_is_attached=False, timeout=4):
+        """ If the Python node dies before publishing a collision object update
+            message, the message could get lost and the box will not appear.
+            To ensure that the updates are made, we wait until we see the
+            changes reflected in the ``get_attached_objects()`` and
+            ``get_known_object_names()`` lists.
+            For the purpose of this tutorial, we call this function after
+            adding, removing, attaching or detaching an object in the planning
+            scene. We then wait until the updates have been made or ``timeout``
+            seconds have passed
+        """
+
+        box_name = self.box_name
+        scene = self.scene
+
+        start = rospy.get_time()
+        seconds = rospy.get_time()
+        while (seconds - start < timeout) and not rospy.is_shutdown():
+            # Test if the box is in attached objects
+            attached_objects = scene.get_attached_objects([box_name])
+            is_attached = len(attached_objects.keys()) > 0
+
+            # Test if the box is in the scene.
+            # Note that attaching the box will remove it from known_objects
+            is_known = box_name in scene.get_known_object_names()
+
+        # Test if we are in the expected state
+        if (box_is_attached == is_attached) and (box_is_known == is_known):
+            return True
+
+        # Sleep so that we give other threads time on the processor
+        rospy.sleep(0.1)
+        seconds = rospy.get_time()
+
+        # If we exited the while loop without returning then we timed out
+        return False
+
+    def compute_cartesian(self):  #,data):
+        testingdata = np.array([0.6, -0.320147457674, -0.209, np.pi])
+        data = testingdata
+
+        rospy.loginfo("++++++++++Received desired position+++++++++")
+        # extract x,y,z coordinate from subscriber data
+        self.x_coord = data[0]
+        self.y_coord = data[1]
+        self.z_coord = data[2]
+        theta = data[3]
+        # put coordinate data back to arrays
+        pout = np.array([self.x_coord, self.y_coord, self.z_coord])
+        block_orientation = tr.quaternion_from_euler(theta, 0, 0, 'sxyz')
+        # convert orentation and position to Quaternion
+        quat = Quaternion(*block_orientation)
+
+        self.quat_position = Point(*pout)
+        self.quat_orientation = copy.deepcopy(quat)
+        self.cartesian_reader = True
+
+    def go_to_pose_goal(self):
+        move_group = self.move_group
+        # Planning to a Pose Goal
+        # We can plan a motion for this group to a desired pose for the
+        # end-effector:
+        pose_goal = geometry_msgs.msg.Pose()
+        pose_goal.orientation.w = 1.0
+        pose_goal.position.x = 0.4
+        pose_goal.position.y = 0.1
+        pose_goal.position.z = 0.4
+
+        move_group.set_pose_target(pose_goal)
+
+        # Now, we call the planner to compute the plan and execute it.
+        plan = move_group.go(wait=True)
+        # Calling `stop()` ensures that there is no residual movement
+        move_group.stop()
+        # It is always good to clear your targets after planning with poses.
+        # Note: there is no equivalent function for clear_joint_value_targets()
+        move_group.clear_pose_targets()
+        # For testing:
+        # current_pose = self.move_group.get_current_pose().pose
+
+    def display_trajectory(self, plan):
+        robot = self.robot
+        display_trajectory_publisher = self.display_trajectory_publisher
+
+        # Displaying a Trajectory
+        # You can ask RViz to visualize a plan (aka trajectory) for you. But the
+        # group.plan() method does this automatically so this is not that useful
+        # here (it just displays the same trajectory again):
+        # A `DisplayTrajectory`_ msg has two primary fields, trajectory_start and trajectory.
+        # We populate the trajectory_start with our current robot state to copy over
+        # any AttachedCollisionObjects and add our plan to the trajectory.
+        display_trajectory = moveit_msgs.msg.DisplayTrajectory()
+        display_trajectory.trajectory_start = robot.get_current_state()
+        display_trajectory.trajectory.append(plan)
+        # Publish
+        display_trajectory_publisher.publish(display_trajectory);
+
+    def execute_plan(self, plan):
+        move_group = self.move_group
+
+        # Executing a Plan
+        # Use execute if you would like the robot to follow
+        # the plan that has already been computed:
+        move_group.execute(plan, wait=True)
+
+        # **Note:** The robot's current joint state must be within some tolerance of the
+        # first waypoint in the `RobotTrajectory`_ or ``execute()`` will fail
+
+    def move_arm_standoff(self):
+        self.moving = '1'
+        self.moving_publisher.publish(self.moving)
+        rospy.loginfo("+++++++++++++Going to standoff posistion+++++++++")
+        # def standoff height (above the block)
+
+        # standoff position has same gripper orentation as block orientation
+        self.pose_goal.orientation = self.quat_orientation
+        # add standoff height to the height of the block and get new pose_goal.position
+        z_standoff = self.z_coord + self.standoff
+        pout = np.array([self.x_coord, self.y_coord, z_standoff])
+        self.pose_goal.position = Point(*pout)
+
+        # Calling Moveit to use IK to compute the plan and execute it
+        print(self.pose_goal)
+        self.right_arm_group.set_pose_goal(self.pose_goal)
+        rospy.sleep(3.0)
+        plan_standoff = self.right_arm_group.go(wait=True)
+
+        self.right_arm_group.stop()
+        self.right_arm_group.clear_pose_goals()
+        rospy.sleep(1.0)
+
+    def move_arm_pick(self):
+
+        rospy.loginfo("+++++++++++++Going to pickup posistion+++++++++")
+
+        # standoff position has same gripper orentation and height as block orientation
+        self.pose_goal.orientation = self.quat_orientation
+
+        z_standoff = self.z_coord
+        pout = np.array([self.x_coord, self.y_coord, z_standoff])
+        self.pose_goal.position = Point(*pout)
+
+        # Calling Moveit to use IK to compute the plan and execute it
+        print(self.pose_goal)
+        self.right_arm_group.set_pose_goal(self.pose_goal)
+        rospy.sleep(2.0)
+        plan_standoff = self.right_arm_group.go(wait=True)
+
+        print(self.rangestate)
+        if self.rangestate < 0.4:
+            self.right_gripper.close()
+        else:
+            self.right_gripper.open()
+        self.right_arm_group.stop()
+        self.right_arm_group.clear_pose_goals()
+        rospy.sleep(1.0)
+
+    def move_arm_back_standoff(self):
+
+        rospy.loginfo(
+            "+++++++++++++Going back to stand off posistion+++++++++")
+        self.right_gripper.close()
+        # def standoff height (above the block)
+
+        # standoff position has same gripper orentation as block orientation
+        self.pose_goal.orientation = self.quat_orientation
+        # add standoff height to the height of the block and get new pose_goal.position
+        z_standoff = self.z_coord + self.standoff
+        pout = np.array([self.x_coord, self.y_coord, z_standoff])
+        self.pose_goal.position = Point(*pout)
+
+        # Calling Moveit to use IK to compute the plan and execute it
+        print(self.pose_goal)
+        self.right_arm_group.set_pose_goal(self.pose_goal)
+        rospy.sleep(2.0)
+        plan_backtostandoff = self.right_arm_group.go(wait=True)
+
+        self.right_arm_group.stop()
+        self.right_arm_group.clear_pose_goals()
+        rospy.sleep(1.0)
+
+    def move_arm_standoff2(self):
+
+        rospy.loginfo("+++++++++++++Going to standoff2 posistion+++++++++")
+        # def standoff height (above the block)
+        self.right_gripper.close()
+
+        # standoff position has same gripper orentation as block orientation
+        self.pose_goal.orientation = self.quat_orientation
+        # add standoff height to the height of the block and get new pose_goal.position
+        x_standoff2 = self.x_coord
+        z_standoff2 = self.z_coord + self.standoff
+        y_standoff2 = self.y_coord + 0.2
+        pout = np.array([x_standoff2, y_standoff2, z_standoff2])
+        self.pose_goal.position = Point(*pout)
+
+        # Calling Moveit to use IK to compute the plan and execute it
+        print(self.pose_goal)
+        self.right_arm_group.set_pose_goal(self.pose_goal)
+        rospy.sleep(3.0)
+        plan_standoff2 = self.right_arm_group.go(wait=True)
+
+        self.right_arm_group.stop()
+        self.right_arm_group.clear_pose_goals()
+        rospy.sleep(1.0)
+
+    def move_arm_place(self):
+
+        global placedtimes
+        rospy.loginfo("+++++++++++++Going to place posistion+++++++++")
+
+        self.right_gripper.close()
+        # standoff position has same gripper orentation and height as block orientation
+        self.pose_goal.orientation = self.quat_orientation
+
+        # z_standoff=block_height/2  in case need gripper half height higer than predicted block height.
+
+        self.pose_goal.position = self.quat_position
+        self.placetarget_y = np.linspace(0.2, 0.29, 10)
+        x_place = self.x_coord
+        z_place = self.z_coord
+        y_place = self.y_coord + self.placetarget_y[placedtimes]
+
+        pout = np.array([x_place, y_place, z_place])
+        self.pose_goal.position = Point(*pout)
+
+        # Calling Moveit to use IK to compute the plan and execute it
+        print(self.pose_goal)
+        self.right_arm_group.set_pose_goal(self.pose_goal)
+        rospy.sleep(2.0)
+        plan_place = self.right_arm_group.go(wait=True)
+
+        self.right_gripper.open()
+        self.right_arm_group.stop()
+        self.right_arm_group.clear_pose_goals()
+        rospy.sleep(1.0)
+
+    def move_arm_backstandoff2(self):
+        global placedtimes
+        rospy.loginfo(
+            "+++++++++++++Going back to standoff2 posistion+++++++++")
+        # def standoff height (above the block)
+        self.right_gripper.open()
+
+        # standoff position has same gripper orentation as block orientation
+        self.pose_goal.orientation = self.quat_orientation
+        # add standoff height to the height of the block and get new pose_goal.position
+        x_standoff2 = self.x_coord
+        z_standoff2 = self.z_coord + self.standoff
+        y_standoff2 = self.y_coord + self.placetarget_y[placedtimes]
+        pout = np.array([x_standoff2, y_standoff2, z_standoff2])
+        self.pose_goal.position = Point(*pout)
+
+        # Calling Moveit to use IK to compute the plan and execute it
+        print(self.pose_goal)
+        self.right_arm_group.set_pose_goal(self.pose_goal)
+        rospy.sleep(2.0)
+        plan_backstandoff2 = self.right_arm_group.go(wait=True)
+
+        self.right_arm_group.stop()
+        self.right_arm_group.clear_pose_goals()
+        rospy.sleep(1.0)
+        placedtimes += 1
+        self.moving = '0'
+        self.moving_publisher.publish(self.moving)
+
+
+placedtimes = 0
+
+
+def main():
+    rospy.init_node("moveit_baxter_pickandplace", anonymous=True)
+
+    #listen to the topic which is publishing desired cartian coordinate
+
+    # rospy.Subscriber("square-location",String,self.compute_cartesian)
+
+    try:
+
+        # print("===========Testing start========")
+        # raw_input()
+        movearm = PickPlace()
+        # print("=========recieve desired position====")
+        # raw_input()
+
+        movearm.add_box()
+        movearm.compute_cartesian()
+        # # print("========go to standoff position=====")
+        # # raw_input()
+
+        movearm.move_arm_standoff()
+        # movearm.remove_box()
+        # # print("=====go pickup======")
+        # # raw_input()
+        movearm.move_arm_pick()
+
+        # movearm.move_arm_pick()
+        # # print("=====go back to standoff=======")
+        # # raw_input()
+        movearm.move_arm_back_standoff()
+        # movearm.add_box()
+
+        # # print("======go to standoff 2=====")
+        # # raw_input()
+        movearm.move_arm_standoff2()
+        # movearm.remove_box()
+        # # print("=========go place the block====")
+        # # raw_input()
+        movearm.move_arm_place()
+
+        # # print('========go back to standoff2 ====')
+        # # raw_input()
+        movearm.move_arm_backstandoff2()
+
+        # # print('====back to initial position=====')
+
+    except rospy.ROSInterruptException:
+        pass
+
+    rospy.spin()
+
+
+if __name__ == '__main__':
+    main()
