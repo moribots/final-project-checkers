@@ -18,10 +18,11 @@ from sensor_msgs.msg import Range
 import tf.transformations as tr
 
 
-class PickPlace():
+class PickPlace(object):
     def __init__(self):
+        super(PickPlace, self).__init__()
         rospy.loginfo("Initializing Baxter")
-
+        moveit_commander.roscpp_initialize(sys.argv)
         # Initialize moveit_commander with kin model
         # and current joint states
         self.robot = moveit_commander.RobotCommander()
@@ -29,7 +30,7 @@ class PickPlace():
         # robot's belief of surroundings
         self.scene = moveit_commander.PlanningSceneInterface()
         # Interface used to execute motions
-        self.right_arm_group = moveit_commander.MoveGroupCommander("right_arm")
+        self.move_group = moveit_commander.MoveGroupCommander("right_arm")
 
         # Display Trajectory in RVIZ
         self.display_trajectory_publisher = rospy.Publisher(
@@ -47,25 +48,25 @@ class PickPlace():
         # Getting Basic Information
 
         # Get robot reference frame name
-        self.planning_frame = self.right_arm_group.get_planning_frame()
+        self.planning_frame = self.move_group.get_planning_frame()
         rospy.loginfo("========== Reference frame: %s" % self.planning_frame)
         # Get End Effector link name for this group
-        self.eef_link = self.right_arm_group.get_end_effector_link()
+        self.eef_link = self.move_group.get_end_effector_link()
         rospy.loginfo("========== End effector: %s" % self.eef_link)
         # Get list of all groups in the robot
         self.group_names = self.robot.get_group_names()
-        rospy.loginfo("========== Robot Groups:", self.robot.get_group_names())
+        rospy.loginfo("========== Robot Groups: %s" % self.robot.get_group_names())
 
         # DEBUG: Print Robot State
         self.robot_state = self.robot.get_current_state()
 
         # Planning and Execurtion parameters
-        self.right_arm_group.set_goal_position_tolerance(0.01)
-        self.right_arm_group.set_goal_orientation_tolerance(0.01)
-        self.right_arm_group.set_planning_time(5.0)
-        self.right_arm_group.allow_replanning(False)
-        self.right_arm_group.set_max_velocity_scaling_factor(0.6)
-        self.right_arm_group.set_max_acceleration_scaling_factor(0.6)
+        self.move_group.set_goal_position_tolerance(0.01)
+        self.move_group.set_goal_orientation_tolerance(0.01)
+        self.move_group.set_planning_time(5.0)
+        self.move_group.allow_replanning(False)
+        self.move_group.set_max_velocity_scaling_factor(0.6)
+        self.move_group.set_max_acceleration_scaling_factor(0.6)
 
         # State Gripper (L/R)
         self.right_gripper = Gripper('right', CHECK_VERSION)
@@ -95,6 +96,7 @@ class PickPlace():
     def add_box(self, timeout=4):
         """
         """
+        self.box_name = 'table'
         box_name = self.box_name
         scene = self.scene
 
@@ -187,7 +189,27 @@ class PickPlace():
         # If we exited the while loop without returning then we timed out
         return False
 
-    def compute_cartesian(self):  #,data):
+    def go_to_joint_state(self):
+        move_group = self.move_group
+        # Planning to a Joint Goal
+        # We can get the joint values from the group and adjust some of the values:
+        joint_goal = move_group.get_current_joint_values()
+        joint_goal[0] = 0
+        joint_goal[1] = -pi/4
+        joint_goal[2] = 0
+        joint_goal[3] = -pi/2
+        joint_goal[4] = 0
+        joint_goal[5] = pi/3
+        joint_goal[6] = 0
+
+        # The go command can be called with joint values, poses, or without any
+        # parameters if you have already set the pose or joint target for the group
+        move_group.go(joint_goal, wait=True)
+
+        # Calling ``stop()`` ensures that there is no residual movement
+        move_group.stop()
+
+    def compute_cartesian(self):
         testingdata = np.array([0.6, -0.320147457674, -0.209, np.pi])
         data = testingdata
 
@@ -229,6 +251,40 @@ class PickPlace():
         move_group.clear_pose_targets()
         # For testing:
         # current_pose = self.move_group.get_current_pose().pose
+
+    def plan_cartesian_path(self, scale=1):
+        move_group = self.move_group
+        # Cartesian Paths
+        # You can plan a Cartesian path directly by specifying a list of waypoints
+        # for the end-effector to go through. If executing  interactively in a
+        # Python shell, set scale = 1.0.
+        waypoints = []
+
+        wpose = move_group.get_current_pose().pose
+        wpose.position.z -= scale * 0.1  # First move up (z)
+        wpose.position.y += scale * 0.2  # and sideways (y)
+        waypoints.append(copy.deepcopy(wpose))
+
+        wpose.position.x += scale * 0.1  # Second move forward/backwards in (x)
+        waypoints.append(copy.deepcopy(wpose))
+
+        wpose.position.y -= scale * 0.1  # Third move sideways (y)
+        waypoints.append(copy.deepcopy(wpose))
+
+        # We want the Cartesian path to be interpolated at a resolution of 1 cm
+        # which is why we will specify 0.01 as the eef_step in Cartesian
+        # translation.  We will disable the jump threshold by setting it to 0.0,
+        # ignoring the check for infeasible jumps in joint space, which is sufficient
+        # for this tutorial
+        (plan, fraction) = move_group.compute_cartesian_path(
+                                           waypoints,   # waypoints to follow
+                                           0.01,        # eef_step
+                                           0.0)         # jump_threshold
+
+        # Note: We are just planning, not asking move_group to actually move the robot yet:
+        return plan, fraction
+
+        ## END_SUB_TUTORIAL
 
     def display_trajectory(self, plan):
         robot = self.robot
@@ -273,12 +329,12 @@ class PickPlace():
 
         # Calling Moveit to use IK to compute the plan and execute it
         print(self.pose_goal)
-        self.right_arm_group.set_pose_goal(self.pose_goal)
+        self.move_group.set_pose_goal(self.pose_goal)
         rospy.sleep(3.0)
-        plan_standoff = self.right_arm_group.go(wait=True)
+        plan_standoff = self.move_group.go(wait=True)
 
-        self.right_arm_group.stop()
-        self.right_arm_group.clear_pose_goals()
+        self.move_group.stop()
+        self.move_group.clear_pose_goals()
         rospy.sleep(1.0)
 
     def move_arm_pick(self):
@@ -294,17 +350,17 @@ class PickPlace():
 
         # Calling Moveit to use IK to compute the plan and execute it
         print(self.pose_goal)
-        self.right_arm_group.set_pose_goal(self.pose_goal)
+        self.move_group.set_pose_goal(self.pose_goal)
         rospy.sleep(2.0)
-        plan_standoff = self.right_arm_group.go(wait=True)
+        plan_standoff = self.move_group.go(wait=True)
 
         print(self.rangestate)
         if self.rangestate < 0.4:
             self.right_gripper.close()
         else:
             self.right_gripper.open()
-        self.right_arm_group.stop()
-        self.right_arm_group.clear_pose_goals()
+        self.move_group.stop()
+        self.move_group.clear_pose_goals()
         rospy.sleep(1.0)
 
     def move_arm_back_standoff(self):
@@ -323,12 +379,12 @@ class PickPlace():
 
         # Calling Moveit to use IK to compute the plan and execute it
         print(self.pose_goal)
-        self.right_arm_group.set_pose_goal(self.pose_goal)
+        self.move_group.set_pose_goal(self.pose_goal)
         rospy.sleep(2.0)
-        plan_backtostandoff = self.right_arm_group.go(wait=True)
+        plan_backtostandoff = self.move_group.go(wait=True)
 
-        self.right_arm_group.stop()
-        self.right_arm_group.clear_pose_goals()
+        self.move_group.stop()
+        self.move_group.clear_pose_goals()
         rospy.sleep(1.0)
 
     def move_arm_standoff2(self):
@@ -348,12 +404,12 @@ class PickPlace():
 
         # Calling Moveit to use IK to compute the plan and execute it
         print(self.pose_goal)
-        self.right_arm_group.set_pose_goal(self.pose_goal)
+        self.move_group.set_pose_goal(self.pose_goal)
         rospy.sleep(3.0)
-        plan_standoff2 = self.right_arm_group.go(wait=True)
+        plan_standoff2 = self.move_group.go(wait=True)
 
-        self.right_arm_group.stop()
-        self.right_arm_group.clear_pose_goals()
+        self.move_group.stop()
+        self.move_group.clear_pose_goals()
         rospy.sleep(1.0)
 
     def move_arm_place(self):
@@ -378,13 +434,13 @@ class PickPlace():
 
         # Calling Moveit to use IK to compute the plan and execute it
         print(self.pose_goal)
-        self.right_arm_group.set_pose_goal(self.pose_goal)
+        self.move_group.set_pose_goal(self.pose_goal)
         rospy.sleep(2.0)
-        plan_place = self.right_arm_group.go(wait=True)
+        plan_place = self.move_group.go(wait=True)
 
         self.right_gripper.open()
-        self.right_arm_group.stop()
-        self.right_arm_group.clear_pose_goals()
+        self.move_group.stop()
+        self.move_group.clear_pose_goals()
         rospy.sleep(1.0)
 
     def move_arm_backstandoff2(self):
@@ -405,12 +461,12 @@ class PickPlace():
 
         # Calling Moveit to use IK to compute the plan and execute it
         print(self.pose_goal)
-        self.right_arm_group.set_pose_goal(self.pose_goal)
+        self.move_group.set_pose_goal(self.pose_goal)
         rospy.sleep(2.0)
-        plan_backstandoff2 = self.right_arm_group.go(wait=True)
+        plan_backstandoff2 = self.move_group.go(wait=True)
 
-        self.right_arm_group.stop()
-        self.right_arm_group.clear_pose_goals()
+        self.move_group.stop()
+        self.move_group.clear_pose_goals()
         rospy.sleep(1.0)
         placedtimes += 1
         self.moving = '0'
@@ -421,7 +477,7 @@ placedtimes = 0
 
 
 def main():
-    rospy.init_node("moveit_baxter_pickandplace", anonymous=True)
+    rospy.init_node("moveit_motion_plan", anonymous=True)
 
     #listen to the topic which is publishing desired cartian coordinate
 
@@ -429,45 +485,100 @@ def main():
 
     try:
 
-        # print("===========Testing start========")
+        print ""
+        print "----------------------------------------------------------"
+        print "Welcome to the MoveIt MoveGroup Python Interface Tutorial"
+        print "----------------------------------------------------------"
+        print "Press Ctrl-D to exit at any time"
+        print ""
+        print "============ Press `Enter` to begin the tutorial by setting up the moveit_commander ..."
+        raw_input()
+        tutorial = PickPlace()
+
+        # print "============ Press `Enter` to execute a movement using a joint state goal ..."
         # raw_input()
-        movearm = PickPlace()
-        # print("=========recieve desired position====")
-        # raw_input()
+        # tutorial.go_to_joint_state()
 
-        movearm.add_box()
-        movearm.compute_cartesian()
-        # # print("========go to standoff position=====")
+        print "============ Press `Enter` to execute a movement using a pose goal ..."
+        raw_input()
+        tutorial.go_to_pose_goal()
+
+        print "============ Press `Enter` to plan and display a Cartesian path ..."
+        raw_input()
+        cartesian_plan, fraction = tutorial.plan_cartesian_path()
+
+        print "============ Press `Enter` to display a saved trajectory (this will replay the Cartesian path)  ..."
+        raw_input()
+        tutorial.display_trajectory(cartesian_plan)
+
+        print "============ Press `Enter` to execute a saved path ..."
+        raw_input()
+        tutorial.execute_plan(cartesian_plan)
+
+        print "============ Press `Enter` to add a box to the planning scene ..."
+        raw_input()
+        tutorial.add_box()
+
+        print "============ Press `Enter` to attach a Box to the Panda robot ..."
+        raw_input()
+        tutorial.attach_box()
+
+        print "============ Press `Enter` to plan and execute a path with an attached collision object ..."
+        raw_input()
+        cartesian_plan, fraction = tutorial.plan_cartesian_path(scale=-1)
+        tutorial.execute_plan(cartesian_plan)
+
+        print "============ Press `Enter` to detach the box from the Baxter robot ..."
+        raw_input()
+        tutorial.detach_box()
+
+        print "============ Press `Enter` to remove the box from the planning scene ..."
+        raw_input()
+        tutorial.remove_box()
+
+        print "============ Python tutorial demo complete!"
+
+        # # print("===========Testing start========")
+        # # raw_input()
+        # movearm = PickPlace()
+        # # print("=========recieve desired position====")
         # # raw_input()
 
-        movearm.move_arm_standoff()
-        # movearm.remove_box()
-        # # print("=====go pickup======")
-        # # raw_input()
-        movearm.move_arm_pick()
-
-        # movearm.move_arm_pick()
-        # # print("=====go back to standoff=======")
-        # # raw_input()
-        movearm.move_arm_back_standoff()
         # movearm.add_box()
+        # movearm.compute_cartesian()
+        # # # print("========go to standoff position=====")
+        # # # raw_input()
 
-        # # print("======go to standoff 2=====")
-        # # raw_input()
-        movearm.move_arm_standoff2()
-        # movearm.remove_box()
-        # # print("=========go place the block====")
-        # # raw_input()
-        movearm.move_arm_place()
+        # movearm.move_arm_standoff()
+        # # movearm.remove_box()
+        # # # print("=====go pickup======")
+        # # # raw_input()
+        # movearm.move_arm_pick()
 
-        # # print('========go back to standoff2 ====')
-        # # raw_input()
-        movearm.move_arm_backstandoff2()
+        # # movearm.move_arm_pick()
+        # # # print("=====go back to standoff=======")
+        # # # raw_input()
+        # movearm.move_arm_back_standoff()
+        # # movearm.add_box()
 
-        # # print('====back to initial position=====')
+        # # # print("======go to standoff 2=====")
+        # # # raw_input()
+        # movearm.move_arm_standoff2()
+        # # movearm.remove_box()
+        # # # print("=========go place the block====")
+        # # # raw_input()
+        # movearm.move_arm_place()
+
+        # # # print('========go back to standoff2 ====')
+        # # # raw_input()
+        # movearm.move_arm_backstandoff2()
+
+        # # # print('====back to initial position=====')
 
     except rospy.ROSInterruptException:
-        pass
+        return
+    except KeyboardInterrupt:
+        return
 
     rospy.spin()
 
