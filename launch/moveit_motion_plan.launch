@@ -2,10 +2,9 @@
   <!-- Start the baxter interface package -->
     <node name="joint_trajectory_action_server" pkg="baxter_interface" type="joint_trajectory_action_server.py" />
 
-    <include file="$(find baxter_moveit_config)/launch/baxter_grippers.launch">
+    <include file="$(find baxter_moveit_config)/launch/baxter_grippers.launch"/>
 
-    </include>
-     <node name="moveit_motion_plan" pkg="checkers" type="moveit_motion_plan" output="screen" />
+    <node name="moveit_motion_plan" pkg="checkers" type="moveit_motion_plan" output="screen" />
     
 
 </launch>

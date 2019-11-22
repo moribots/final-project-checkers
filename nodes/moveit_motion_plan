@@ -7,6 +7,7 @@ import copy
 import rospy
 import moveit_commander
 import moveit_msgs.msg
+from moveit_msgs.msg import Grasp
 import geometry_msgs.msg
 from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
 import numpy as np
@@ -20,11 +21,13 @@ import tf.transformations as tr
 
 class PickPlace(object):
     def __init__(self):
-        super(PickPlace, self).__init__()
-        rospy.loginfo("Initializing Baxter")
-        moveit_commander.roscpp_initialize(sys.argv)
         # Initialize moveit_commander with kin model
         # and current joint states
+        rospy.loginfo("Initializing Baxter")
+        super(PickPlace, self).__init__()
+        # joint_state_topic = ['joint_states:=/joint_states_desired']
+        # moveit_commander.roscpp_initialize(joint_state_topic)
+        moveit_commander.roscpp_initialize(sys.argv)
         self.robot = moveit_commander.RobotCommander()
         # Remote interface for getting, setting and updating
         # robot's belief of surroundings
@@ -96,24 +99,22 @@ class PickPlace(object):
     def add_box(self, timeout=4):
         """
         """
+        # Add Objects to Planning Scene
         self.box_name = 'table'
         box_name = self.box_name
         scene = self.scene
-
-        # Add Objects to Planning Scene
-        self.box_name = 'table'
         self.box_pose = PoseStamped()
         # Can reference to base frame
         # Or can reference to EE finger frame
         # for grasping
         self.box_pose.header.frame_id = "base"
-        self.box_pose.pose.position.x = 1.0
-        self.box_pose.pose.position.z = -0.27
+        self.box_pose.pose.position.x = 0.5
+        self.box_pose.pose.position.z = -0.63
         self.box_pose.pose.orientation.w = 1.0
-        self.scene.add_box(self.box_name, self.box_pose, size=(1.5, 2, 0.1))
+        self.scene.add_box(self.box_name, self.box_pose, size=(0.4, 0.5, 0.66))
 
         self.box_name = box_name
-        return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+        # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
 
     def attach_box(self, timeout=4):
         box_name = self.box_name
@@ -127,11 +128,11 @@ class PickPlace(object):
         # planning scene to ignore collisions between those links and the box. For the Panda
         # robot, we set ``grasping_group = 'hand'``. If you are using a different robot,
         # you should change this value to the name of your end effector group name.
-        grasping_group = 'hand'
+        grasping_group = 'right_hand'
         touch_links = robot.get_link_names(group=grasping_group)
         scene.attach_box(eef_link, box_name, touch_links=touch_links)
         # We wait for the planning scene to update.
-        return self.wait_for_state_update(box_is_attached=True, box_is_known=False, timeout=timeout)
+        # return self.wait_for_state_update(box_is_attached=True, box_is_known=False, timeout=timeout)
 
     def detach_box(self, timeout=4):
         box_name = self.box_name
@@ -141,7 +142,7 @@ class PickPlace(object):
         # We can also detach and remove the object from the planning scene:
         scene.remove_attached_object(eef_link, name=box_name)
         # We wait for the planning scene to update.
-        return self.wait_for_state_update(box_is_known=True, box_is_attached=False, timeout=timeout)
+        # return self.wait_for_state_update(box_is_known=True, box_is_attached=False, timeout=timeout)
 
     def remove_box(self, timeout=4):
         box_name = self.box_name
@@ -150,7 +151,7 @@ class PickPlace(object):
         scene.remove_world_object(box_name)
         # **Note:** The object must be detached before we can remove it from the world
         # We wait for the planning scene to update.
-        return self.wait_for_state_update(box_is_attached=False, box_is_known=False, timeout=timeout)
+        # return self.wait_for_state_update(box_is_attached=False, box_is_known=False, timeout=timeout)
 
     def wait_for_state_update(self, box_is_known=False, box_is_attached=False, timeout=4):
         """ If the Python node dies before publishing a collision object update
@@ -495,6 +496,10 @@ def main():
         raw_input()
         tutorial = PickPlace()
 
+        print "============ Press `Enter` to add a box to the planning scene ..."
+        raw_input()
+        tutorial.add_box()
+
         # print "============ Press `Enter` to execute a movement using a joint state goal ..."
         # raw_input()
         # tutorial.go_to_joint_state()
@@ -503,40 +508,38 @@ def main():
         raw_input()
         tutorial.go_to_pose_goal()
 
-        print "============ Press `Enter` to plan and display a Cartesian path ..."
-        raw_input()
-        cartesian_plan, fraction = tutorial.plan_cartesian_path()
+        tutorial.right_gripper.close()
 
-        print "============ Press `Enter` to display a saved trajectory (this will replay the Cartesian path)  ..."
-        raw_input()
-        tutorial.display_trajectory(cartesian_plan)
+        # print "============ Press `Enter` to plan and display a Cartesian path ..."
+        # raw_input()
+        # cartesian_plan, fraction = tutorial.plan_cartesian_path()
 
-        print "============ Press `Enter` to execute a saved path ..."
-        raw_input()
-        tutorial.execute_plan(cartesian_plan)
+        # print "============ Press `Enter` to display a saved trajectory (this will replay the Cartesian path)  ..."
+        # raw_input()
+        # tutorial.display_trajectory(cartesian_plan)
 
-        print "============ Press `Enter` to add a box to the planning scene ..."
-        raw_input()
-        tutorial.add_box()
+        # print "============ Press `Enter` to execute a saved path ..."
+        # raw_input()
+        # tutorial.execute_plan(cartesian_plan)
 
-        print "============ Press `Enter` to attach a Box to the Panda robot ..."
-        raw_input()
-        tutorial.attach_box()
+        # print "============ Press `Enter` to attach a Box to the Panda robot ..."
+        # raw_input()
+        # tutorial.attach_box()
 
-        print "============ Press `Enter` to plan and execute a path with an attached collision object ..."
-        raw_input()
-        cartesian_plan, fraction = tutorial.plan_cartesian_path(scale=-1)
-        tutorial.execute_plan(cartesian_plan)
+        # print "============ Press `Enter` to plan and execute a path with an attached collision object ..."
+        # raw_input()
+        # cartesian_plan, fraction = tutorial.plan_cartesian_path(scale=-1)
+        # tutorial.execute_plan(cartesian_plan)
 
-        print "============ Press `Enter` to detach the box from the Baxter robot ..."
-        raw_input()
-        tutorial.detach_box()
+        # print "============ Press `Enter` to detach the box from the Baxter robot ..."
+        # raw_input()
+        # tutorial.detach_box()
 
-        print "============ Press `Enter` to remove the box from the planning scene ..."
-        raw_input()
-        tutorial.remove_box()
+        # print "============ Press `Enter` to remove the box from the planning scene ..."
+        # raw_input()
+        # tutorial.remove_box()
 
-        print "============ Python tutorial demo complete!"
+        # print "============ Python tutorial demo complete!"
 
         # # print("===========Testing start========")
         # # raw_input()
