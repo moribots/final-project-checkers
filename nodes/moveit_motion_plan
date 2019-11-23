@@ -8,7 +8,8 @@ import rospy
 import numpy as np
 import moveit_commander
 import moveit_msgs.msg
-from moveit_msgs.msg import Grasp, CollisionObject  # For pickplace
+from moveit_msgs.msg import Grasp, PlaceLocation  # For pickplace
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint  # for pickplace
 from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
 from baxter_interface import Gripper, CHECK_VERSION
 import tf.transformations as tr
@@ -16,13 +17,16 @@ import tf.transformations as tr
 
 class PickPlace(object):
     def __init__(self):
-        # Initialize moveit_commander with kin model
-        # and current joint states
         rospy.loginfo("Initializing Baxter")
         super(PickPlace, self).__init__()
+        # Initialize moveit_commander with kin model
+        # and current joint states
+        joint_state_topic = ['joint_states:=/robot/joint_states']
+        moveit_commander.roscpp_initialize(joint_state_topic)
+        # roscpp_initialize(sys.argv)
         # joint_state_topic = ['joint_states:=/joint_states_desired']
         # moveit_commander.roscpp_initialize(joint_state_topic)
-        moveit_commander.roscpp_initialize(sys.argv)
+        # moveit_commander.roscpp_initialize(sys.argv)
         self.robot = moveit_commander.RobotCommander()
         # Remote interface for getting, setting and updating
         # robot's belief of surroundings
@@ -56,7 +60,7 @@ class PickPlace(object):
         self.move_group.set_goal_position_tolerance(0.01)
         self.move_group.set_goal_orientation_tolerance(0.01)
         self.move_group.set_planning_time(5.0)
-        self.move_group.allow_replanning(False)
+        self.move_group.allow_replanning(True)
         self.move_group.set_max_velocity_scaling_factor(0.6)
         self.move_group.set_max_acceleration_scaling_factor(0.6)
 
@@ -70,14 +74,25 @@ class PickPlace(object):
         self.right_gripper.open()
         # tutorial.right_gripper.close()
 
+        # Standoff is the amount by which we approach
+        # and retreat pre and post grasp
+        self.standoff = 0.1
+
+        # z is the z position of the objects we want to grasp
+        # hard-coded for now but later will be set in calibration
+        self.z = -0.311 + 0.05
+
         # Initialise attribute for desired EE Pose
         self.pose_goal = Pose()
 
         # Grasp Message
-        self.grasp = Grasp()
+        self.pick = Grasp()
+
+        # PlaceLocation Message
+        self.place = PlaceLocation()
 
         # Chekcers piece
-        self.puck = CollisionObject()
+        # self.puck = CollisionObject()
 
     def add_box(self, timeout=4):
         """
@@ -90,7 +105,7 @@ class PickPlace(object):
         # for grasping
         self.box_pose.header.frame_id = "base"
         self.box_pose.pose.position.x = 0.5
-        self.box_pose.pose.position.z = -0.3075
+        self.box_pose.pose.position.z = -0.311
         self.box_pose.pose.orientation.w = 1.0
         # Length, Width, Height
         self.scene.add_box(self.box_name, self.box_pose, size=(0.6, 0.8, 0.1))
@@ -133,7 +148,10 @@ class PickPlace(object):
         # We wait for the planning scene to update.
         # return self.wait_for_state_update(box_is_attached=False, box_is_known=False, timeout=timeout)
 
-    def wait_for_state_update(self, box_is_known=False, box_is_attached=False, timeout=4):
+    def wait_for_state_update(self,
+                              box_is_known=False,
+                              box_is_attached=False,
+                              timeout=4):
         """ If the Python node dies before publishing a collision object update
             message, the message could get lost and the box will not appear.
             To ensure that the updates are made, we wait until we see the
@@ -167,64 +185,25 @@ class PickPlace(object):
         rospy.sleep(0.1)
         seconds = rospy.get_time()
 
-        # If we exited the while loop without returning then we timed out
+        # If we exiterd the while loop without returning then we timed out
         return False
 
-    def go_to_joint_state(self):
-        move_group = self.move_group
-        # Planning to a Joint Goal
-        # We can get the joint values from the group and adjust some of the values:
-        joint_goal = move_group.get_current_joint_values()
-        joint_goal[0] = 0
-        joint_goal[1] = -pi/4
-        joint_goal[2] = 0
-        joint_goal[3] = -pi/2
-        joint_goal[4] = 0
-        joint_goal[5] = pi/3
-        joint_goal[6] = 0
-
-        # The go command can be called with joint values, poses, or without any
-        # parameters if you have already set the pose or joint target for the group
-        move_group.go(joint_goal, wait=True)
-
-        # Calling ``stop()`` ensures that there is no residual movement
-        move_group.stop()
-
-    def compute_cartesian(self):
-        testingdata = np.array([0.6, -0.320147457674, -0.209, np.pi])
-        data = testingdata
-
-        rospy.loginfo("++++++++++Received desired position+++++++++")
-        # extract x,y,z coordinate from subscriber data
-        self.x_coord = data[0]
-        self.y_coord = data[1]
-        self.z_coord = data[2]
-        theta = data[3]
-        # put coordinate data back to arrays
-        pout = np.array([self.x_coord, self.y_coord, self.z_coord])
-        block_orientation = tr.quaternion_from_euler(theta, 0, 0, 'sxyz')
-        # convert orentation and position to Quaternion
-        quat = Quaternion(*block_orientation)
-
-        self.quat_position = Point(*pout)
-        self.quat_orientation = copy.deepcopy(quat)
-        self.cartesian_reader = True
-
-    def go_to_pose_goal(self):
+    def go_to_pose_goal(self, goal=[0.5, 0.0]):
         move_group = self.move_group
         # Planning to a Pose Goal
         # We can plan a motion for this group to a desired pose for the
         # end-effector:
         pose_goal = Pose()
         # Quaternion from Euler
-        quaternion = tr.quaternion_from_euler(0, -np.pi / 2, 0)
-        pose_goal.orientation.x = quaternion[0]
-        pose_goal.orientation.y = quaternion[1]
-        pose_goal.orientation.z = quaternion[2]
-        pose_goal.orientation.w = quaternion[3]
-        pose_goal.position.x = 0.4
-        pose_goal.position.y = 0.4
-        pose_goal.position.z = -0.15
+        quaternion = tr.quaternion_from_euler(0, np.pi / 2, 0, 'sxyz')
+        # rospy.loginfo("QUATERNION FOUND {}".format(quaternion))
+        pose_goal.orientation.x = 1
+        pose_goal.orientation.y = 0
+        pose_goal.orientation.z = 0
+        pose_goal.orientation.w = 0
+        pose_goal.position.x = goal[0]
+        pose_goal.position.y = goal[1]
+        pose_goal.position.z = 0.0
 
         move_group.set_pose_target(pose_goal)
 
@@ -238,69 +217,283 @@ class PickPlace(object):
         # For testing:
         # current_pose = self.move_group.get_current_pose().pose
 
-    def plan_cartesian_path(self, scale=1):
-        move_group = self.move_group
-        # Cartesian Paths
-        # You can plan a Cartesian path directly by specifying a list of waypoints
-        # for the end-effector to go through. If executing  interactively in a
-        # Python shell, set scale = 1.0.
+    def pick_routine(self, goal):
+        # PRE GRASP GOAL
+        pre_grasp_goal = Pose()
+        # Always point EE down
+        pre_grasp_goal.orientation.x = 1
+        pre_grasp_goal.position.x = goal[0]
+        pre_grasp_goal.position.y = goal[1]
+        # Set approach position w standoff
+        pre_grasp_goal.position.z = self.z + self.standoff
+
+        # Now move
+        self.move_group.set_pose_target(pre_grasp_goal)
+        # Execute and wait until execution is done
+        self.move_group.go(wait=True)
+        # Stop to ensure no residual movement
+        self.move_group.stop()
+        # Clear targets after planning
+        self.move_group.clear_pose_targets()
+
+        rospy.sleep(0.5)
+
+        # GRASP GOAL
+        grasp_goal = Pose()
+        # Always point EE down
+        grasp_goal.orientation.x = 1
+        grasp_goal.position.x = goal[0]
+        grasp_goal.position.y = goal[1]
+        # Set grasp position w/o standoff
+        grasp_goal.position.z = self.z
+
+        # Now move
+        self.move_group.set_pose_target(grasp_goal)
+        # Execute and wait until execution is done
+        self.move_group.go(wait=True)
+        # Stop to ensure no residual movement
+        self.move_group.stop()
+        # Clear targets after planning
+        self.move_group.clear_pose_targets()
+
+        # Close Gripper to grasp
+        self.right_gripper.close()
+
+        rospy.sleep(0.5)
+
+        # RETREAT GOAL (same as pre-grasp)
+        # Now move
+        self.move_group.set_pose_target(pre_grasp_goal)
+        # Execute and wait until execution is done
+        self.move_group.go(wait=True)
+        # Stop to ensure no residual movement
+        self.move_group.stop()
+        # Clear targets after planning
+        self.move_group.clear_pose_targets()
+
+        rospy.sleep(0.5)
+
+    def place_routine(self, goal):
+        # PRE PLACE GOAL
+        pre_place_goal = Pose()
+        # Always point EE down
+        pre_place_goal.orientation.x = 1
+        pre_place_goal.position.x = goal[0]
+        pre_place_goal.position.y = goal[1]
+        # Set approach position w standoff
+        pre_place_goal.position.z = self.z + self.standoff
+
+        # Now move
+        self.move_group.set_pose_target(pre_place_goal)
+        # Execute and wait until execution is done
+        self.move_group.go(wait=True)
+        # Stop to ensure no residual movement
+        self.move_group.stop()
+        # Clear targets after planning
+        self.move_group.clear_pose_targets()
+
+        rospy.sleep(0.5)
+
+        # PLACE GOAL
+        place_goal = Pose()
+        # Always point EE down
+        place_goal.orientation.x = 1
+        place_goal.position.x = goal[0]
+        place_goal.position.y = goal[1]
+        # Set grasp position w/o standoff
+        place_goal.position.z = self.z
+
+        # Now move
+        self.move_group.set_pose_target(place_goal)
+        # Execute and wait until execution is done
+        self.move_group.go(wait=True)
+        # Stop to ensure no residual movement
+        self.move_group.stop()
+        # Clear targets after planning
+        self.move_group.clear_pose_targets()
+
+        # Open Gripper to release
+        self.right_gripper.open()
+
+        rospy.sleep(0.5)
+
+        # RETREAT GOAL (same as pre-place)
+        # Now move
+        self.move_group.set_pose_target(pre_place_goal)
+        # Execute and wait until execution is done
+        self.move_group.go(wait=True)
+        # Stop to ensure no residual movement
+        self.move_group.stop()
+        # Clear targets after planning
+        self.move_group.clear_pose_targets()
+
+        rospy.sleep(0.5)
+
+    def pick_cartesian(self, goal):
+        # APPROACH GOAL
+        rospy.loginfo("================== Approach ==============")
+        ee_pose = self.move_group.get_current_pose().pose
         waypoints = []
+        iter = 20
+        xiter = np.linspace(ee_pose.position.x, goal[0], iter)
+        yiter = np.linspace(ee_pose.position.y, goal[1], iter)
+        ziter = np.linspace(ee_pose.position.z, self.z + self.standoff, iter)
+        for i in range(iter):
+            p = copy.deepcopy(ee_pose)
+            p.position.x = xiter[i]
+            p.position.y = yiter[i]
+            p.position.z = ziter[i]
+            # Point Down
+            if i >= iter - 1:
+                p.orientation.x = 1
+            waypoints.append(p)
+        # Now plan and move
+        self.plan_cartesian_path(waypoints, goal)
+        rospy.sleep(0.5)
 
-        wpose = move_group.get_current_pose().pose
-        wpose.position.z -= scale * 0.1  # First move up (z)
-        wpose.position.y += scale * 0.2  # and sideways (y)
-        waypoints.append(copy.deepcopy(wpose))
+        # GRASP GOAL
+        rospy.loginfo("================== Grasp ==============")
+        ee_pose = self.move_group.get_current_pose().pose
+        waypoints = []
+        iter = 20
+        xiter = np.linspace(ee_pose.position.x, goal[0], iter)
+        yiter = np.linspace(ee_pose.position.y, goal[1], iter)
+        ziter = np.linspace(ee_pose.position.z, self.z, iter)
+        for i in range(iter):
+            p = copy.deepcopy(ee_pose)
+            p.position.x = xiter[i]
+            p.position.y = yiter[i]
+            p.position.z = ziter[i]
+            # Point Down
+            if i >= iter - 1:
+                p.orientation.x = 1
+            waypoints.append(p)
+        # Now plan and move
+        self.plan_cartesian_path(waypoints, goal)
+        rospy.sleep(0.5)
 
-        wpose.position.x += scale * 0.1  # Second move forward/backwards in (x)
-        waypoints.append(copy.deepcopy(wpose))
+        # Close Gripper to grasp
+        self.right_gripper.close()
+        rospy.sleep(0.5)
 
-        wpose.position.y -= scale * 0.1  # Third move sideways (y)
-        waypoints.append(copy.deepcopy(wpose))
+        # RETREAT GOAL (same as approach)
+        rospy.loginfo("================== Retreat ==============")
+        ee_pose = self.move_group.get_current_pose().pose
+        waypoints = []
+        iter = 10
+        xiter = np.linspace(ee_pose.position.x, goal[0], iter)
+        yiter = np.linspace(ee_pose.position.y, goal[1], iter)
+        ziter = np.linspace(ee_pose.position.z, self.z + self.standoff, iter)
+        for i in range(iter):
+            p = copy.deepcopy(ee_pose)
+            p.position.x = xiter[i]
+            p.position.y = yiter[i]
+            p.position.z = ziter[i]
+            # Point Down
+            if i >= iter - 1:
+                p.orientation.x = 1
+            waypoints.append(p)
+        # Now plan and move
+        self.plan_cartesian_path(waypoints, goal)
+        rospy.sleep(0.5)
 
+    def place_cartesian(self, goal):
+        # APPROACH GOAL
+        rospy.loginfo("================== Approach ==============")
+        ee_pose = self.move_group.get_current_pose().pose
+        waypoints = []
+        iter = 20
+        xiter = np.linspace(ee_pose.position.x, goal[0], iter)
+        yiter = np.linspace(ee_pose.position.y, goal[1], iter)
+        ziter = np.linspace(ee_pose.position.z, self.z + self.standoff, iter)
+        for i in range(iter):
+            p = copy.deepcopy(ee_pose)
+            p.position.x = xiter[i]
+            p.position.y = yiter[i]
+            p.position.z = ziter[i]
+            # Point Down
+            if i >= iter - 1:
+                p.orientation.x = 1
+            waypoints.append(p)
+        # Now plan and move
+        self.plan_cartesian_path(waypoints, goal)
+        rospy.sleep(0.5)
+
+        # GRASP GOAL
+        rospy.loginfo("================== Release ==============")
+        ee_pose = self.move_group.get_current_pose().pose
+        waypoints = []
+        iter = 20
+        xiter = np.linspace(ee_pose.position.x, goal[0], iter)
+        yiter = np.linspace(ee_pose.position.y, goal[1], iter)
+        ziter = np.linspace(ee_pose.position.z, self.z, iter)
+        for i in range(iter):
+            p = copy.deepcopy(ee_pose)
+            p.position.x = xiter[i]
+            p.position.y = yiter[i]
+            p.position.z = ziter[i]
+            # Point Down
+            if i >= iter - 1:
+                p.orientation.x = 1
+            waypoints.append(p)
+        # Now plan and move
+        self.plan_cartesian_path(waypoints, goal)
+        rospy.sleep(0.5)
+
+        # Close Gripper to grasp
+        self.right_gripper.open()
+        rospy.sleep(0.5)
+
+        # RETREAT GOAL (same as approach)
+        rospy.loginfo("================== Retreat ==============")
+        ee_pose = self.move_group.get_current_pose().pose
+        waypoints = []
+        iter = 10
+        xiter = np.linspace(ee_pose.position.x, goal[0], iter)
+        yiter = np.linspace(ee_pose.position.y, goal[1], iter)
+        ziter = np.linspace(ee_pose.position.z, self.z + self.standoff, iter)
+        for i in range(iter):
+            p = copy.deepcopy(ee_pose)
+            p.position.x = xiter[i]
+            p.position.y = yiter[i]
+            p.position.z = ziter[i]
+            # Point Down
+            if i >= iter - 1:
+                p.orientation.x = 1
+            waypoints.append(p)
+        # Now plan and move
+        self.plan_cartesian_path(waypoints, goal)
+        rospy.sleep(0.5)
+
+    def plan_cartesian_path(self, waypoints, goal):
+        # Scale = -1 for python according to tutorial
+        # You can plan a Cartesian path by specifying a list of waypoints
+        # for the end-effector to go through:
+        self.move_group.set_start_state_to_current_state()
+        fraction = 0.0
+        max_attempts = 50
+        attempts = 0
+
+        # Plan the Cartesian path connecting the waypoints
         # We want the Cartesian path to be interpolated at a resolution of 1 cm
         # which is why we will specify 0.01 as the eef_step in Cartesian
-        # translation.  We will disable the jump threshold by setting it to 0.0,
-        # ignoring the check for infeasible jumps in joint space, which is sufficient
-        # for this tutorial
-        (plan, fraction) = move_group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
+        # translation.  Disable jump thresh by setting it to 0.0
+        # waypoints to follow, eef_step, jump_threshold
+        while fraction <= 0.8 and attempts < max_attempts:
+            plan, fraction = self.move_group.compute_cartesian_path(waypoints, 0.01, 0.0)
+            # Increment the number of attempts
+            attempts += 1
+        # If we have a complete plan, execute the trajectory
+        if fraction >= 0.8:
+            rospy.loginfo("Path computed successfully. Moving the arm.")
+            self.move_group.execute(plan, wait=True)
 
-        # Note: We are just planning, not asking move_group to actually move the robot yet:
-        return plan, fraction
+        else:
+            rospy.logerr("Could not find valid cartesian path")
+            # Go back to start
+            self.go_to_pose_goal(goal)
 
-        ## END_SUB_TUTORIAL
-
-    def display_trajectory(self, plan):
-        robot = self.robot
-        display_trajectory_publisher = self.display_trajectory_publisher
-
-        # Displaying a Trajectory
-        # You can ask RViz to visualize a plan (aka trajectory) for you. But the
-        # group.plan() method does this automatically so this is not that useful
-        # here (it just displays the same trajectory again):
-        # A `DisplayTrajectory`_ msg has two primary fields, trajectory_start and trajectory.
-        # We populate the trajectory_start with our current robot state to copy over
-        # any AttachedCollisionObjects and add our plan to the trajectory.
-        display_trajectory = moveit_msgs.msg.DisplayTrajectory()
-        display_trajectory.trajectory_start = robot.get_current_state()
-        display_trajectory.trajectory.append(plan)
-        # Publish
-        display_trajectory_publisher.publish(display_trajectory);
-
-    def execute_plan(self, plan):
-        move_group = self.move_group
-
-        # Executing a Plan
-        # Use execute if you would like the robot to follow
-        # the plan that has already been computed:
-        move_group.execute(plan, wait=True)
-
-        # **Note:** The robot's current joint state must be within some tolerance of the
-        # first waypoint in the `RobotTrajectory`_ or ``execute()`` will fail
-
-    def pick(self):
+    def pick_cpp(self):
         """ DESCRIPTION
 
             Args:
@@ -308,43 +501,65 @@ class PickPlace(object):
             Returns:
         """
         # PICK POSE
-        self.grasp.grasp_pose.header.frame_id = "base"
+        self.pick.grasp_pose.header.frame_id = "base"
         # Quaternion from Euler
-        quaternion = tr.quaternion_from_euler(0, -np.pi / 2, 0)
-        self.grasp.grasp_pose.pose.orientation.x = quaternion[0]
-        self.grasp.grasp_pose.pose.orientation.y = quaternion[1]
-        self.grasp.grasp_pose.pose.orientation.z = quaternion[2]
-        self.grasp.grasp_pose.pose.orientation.w = quaternion[3]
-        self.grasp.grasp_pose.pose.position.x = 0.4
-        self.grasp.grasp_pose.pose.position.y = 0.4
-        self.grasp.grasp_pose.pose.position.z = -0.15
+        # quaternion = tr.quaternion_from_euler(0, np.pi / 2, 0, 'sxyz')
+        self.pick.grasp_pose.pose.orientation.x = 1
+        self.pick.grasp_pose.pose.orientation.y = 0
+        self.pick.grasp_pose.pose.orientation.z = 0
+        self.pick.grasp_pose.pose.orientation.w = 0
+        self.pick.grasp_pose.pose.position.x = 0.5
+        self.pick.grasp_pose.pose.position.y = 0.0
+        self.pick.grasp_pose.pose.position.z = -0.3075 + 0.1
 
         # APPROACH
         # Defined with respect to frame_id
-        self.grasp.pre_grasp_approach.direction.header.frame_id = "base"
+        self.pick.pre_grasp_approach.direction.header.frame_id = "base"
         # Direction in negative z-axis for pre-grasp direction (up)
-        self.grasp.pre_grasp_approach.direction.vector.z = -1.0
-        self.grasp.pre_grasp_approach.min_distance = 0.095
-        self.grasp.pre_grasp_approach.desired_distance = 0.115
+        self.pick.pre_grasp_approach.direction.vector.z = -1.0
+        self.pick.pre_grasp_approach.min_distance = 0.095
+        self.pick.pre_grasp_approach.desired_distance = 0.115
 
         # RETREAT
         # Defined with respect to frame_id
-        self.grasp.post_grasp_retreat.direction.header.frame_id = "base"
+        self.pick.post_grasp_retreat.direction.header.frame_id = "base"
         # Direction is set as positive z axis
-        self.grasp.post_grasp_retreat.direction.vector.z = 1.0
-        self.grasp.post_grasp_retreat.min_distance = 0.1
-        self.grasp.post_grasp_retreat.desired_distance = 0.25
+        self.pick.post_grasp_retreat.direction.vector.z = 1.0
+        self.pick.post_grasp_retreat.min_distance = 0.1
+        self.pick.post_grasp_retreat.desired_distance = 0.25
 
-        # PRE-GRASP POSTURE
+        # PRE-GRASP POSTURE: OPEN GRIPPER
+        pre_grasp_posture = JointTrajectory()
+        pre_grasp_posture.header.frame_id = "base"
+        pre_grasp_posture.header.stamp = rospy.Time.now()
+        pre_grasp_posture.joint_names = [
+            "r_gripper_l_finger", "r_gripper_r_finger"
+        ]
+        pos = JointTrajectoryPoint()  # fingers open
+        pos.positions.append(1.0)
+        pos.positions.append(1.0)
+        pre_grasp_posture.points.append(pos)
+        self.pick.pre_grasp_posture = pre_grasp_posture
 
-        # GRASP POSTURE
+        # GRASP POSTURE: CLOSE GRIPPER
+        grasp_posture = JointTrajectory()
+        grasp_posture.header.frame_id = "base"
+        grasp_posture.header.stamp = rospy.Time.now()
+        grasp_posture.joint_names = [
+            "r_gripper_l_finger", "r_gripper_r_finger"
+        ]
+        pos = JointTrajectoryPoint()  # fingers open
+        pos.positions.append(0.0)
+        pos.positions.append(0.0)
+        grasp_posture.points.append(pos)
+        self.pick.grasp_posture = pre_grasp_posture
 
         # Set Support Surface
-        self.move_group.setSupportSurfaceName("table")
+        # self.move_group.setSupportSurfaceName("table")
         # Perform pick method using grasp vars
-        self.move_group.pick("puck", self.grasp)
+        self.move_group.pick("puck", self.pick)
 
-    def place(self):
+    def place_cpp(self):
         """ DESCRIPTION
 
             Args:
@@ -352,37 +567,50 @@ class PickPlace(object):
             Returns:
         """
         # PLACE POSE
-        self.grasp.place_pose.header.frame_id = "base"
+        self.place.place_pose.header.frame_id = "base"
         # Quaternion from Euler
-        quaternion = tr.quaternion_from_euler(0, -np.pi / 2, 0)
-        self.grasp.place_pose.pose.orientation.x = quaternion[0]
-        self.grasp.place_pose.pose.orientation.y = quaternion[1]
-        self.grasp.place_pose.pose.orientation.z = quaternion[2]
-        self.grasp.place_pose.pose.orientation.w = quaternion[3]
-        self.grasp.place_pose.pose.position.x = 0.4
-        self.grasp.place_pose.pose.position.y = 0.4
-        self.grasp.place_pose.pose.position.z = -0.15
+        # quaternion = tr.quaternion_from_euler(0, np.pi / 2, 0, 'sxyz')
+        self.place.place_pose.pose.orientation.x = 1
+        self.place.place_pose.pose.orientation.y = 0
+        self.place.place_pose.pose.orientation.z = 0
+        self.place.place_pose.pose.orientation.w = 0
+        self.place.place_pose.pose.position.x = 0.5
+        self.place.place_pose.pose.position.y = 0.0
+        self.place.place_pose.pose.position.z = -0.3075 + 0.1
 
         # APPROACH
         # Defined with respect to frame_id
-        self.grasp.pre_place_approach.direction.header.frame_id = "base"
+        self.place.pre_place_approach.direction.header.frame_id = "base"
         # Direction is set as negative z axis
-        self.grasp.pre_place_approach.direction.vector.z = -1.0
-        self.grasp.pre_place_approach.min_distance = 0.095
-        self.grasp.pre_place_approach.desired_distance = 0.115
+        self.place.pre_place_approach.direction.vector.z = -1.0
+        self.place.pre_place_approach.min_distance = 0.095
+        self.place.pre_place_approach.desired_distance = 0.115
 
         # RETREAT
         # Defined with respect to frame_id
-        self.grasp.post_place_retreat.direction.header.frame_id = "base"
+        self.place.post_place_retreat.direction.header.frame_id = "base"
         # Direction is set as negative y axis
-        self.grasp.post_place_retreat.direction.vector.y = -1.0
-        self.grasp.post_place_retreat.min_distance = 0.1
-        self.grasp.post_place_retreat.desired_distance = 0.25
+        self.place.post_place_retreat.direction.vector.y = -1.0
+        self.place.post_place_retreat.min_distance = 0.1
+        self.place.post_place_retreat.desired_distance = 0.25
+
+        # POST PLACE POSTURE: OPEN GRIPPER
+        post_place_posture = JointTrajectory()
+        post_place_posture.header.frame_id = "base"
+        post_place_posture.header.stamp = rospy.Time.now()
+        post_place_posture.joint_names = [
+            "r_gripper_l_finger", "r_gripper_r_finger"
+        ]
+        pos = JointTrajectoryPoint()  # fingers open
+        pos.positions.append(0.0)
+        pos.positions.append(0.0)
+        post_place_posture.points.append(pos)
+        self.place.post_place_posture = post_place_posture
 
         # Set Support Surface
-        self.move_group.setSupportSurfaceName("table")
+        # self.move_group.setSupportSurfaceName("table")
         # Perform place method using grasp vars
-        self.move_group.place("puck", self.grasp)
+        self.move_group.place("puck", self.place)
 
     def pp_object(self):
         """
@@ -399,7 +627,24 @@ class PickPlace(object):
         self.puck_pose.pose.position.z = -0.3075 + 0.05
         self.puck_pose.pose.orientation.w = 1.0
         # TODO: Change to Cylinder
-        self.scene.add_box(self.puck_name, self.puck_pose, size=(25e-3, 25e-3, 10e-3))
+        self.scene.add_box(self.puck_name,
+                           self.puck_pose,
+                           size=(25e-3, 25e-3, 10e-3))
+
+    def open_gripper(self):
+        pos_l = JointTrajectory()
+        pos_r = JointTrajectory()
+
+        # Names
+        pos_l.posture.joint_names = "r_gripper_l_finger"
+        pos_r.posture.joint_names = "r_gripper_r_finger"
+
+        # Open
+        pos_l.posture.points.positions = 1
+        pos_l.posture.points.time_from_start = rospy.Duration(0.5)
+        pos_r.posture.points.positions = 1
+        pos_r.posture.points.time_from_start = rospy.Duration(0.5)
+
 
 def main():
     rospy.init_node("moveit_motion_plan", anonymous=True)
@@ -420,7 +665,7 @@ def main():
 
         print "============ Add a box and checkers piece to the planning scene ..."
         tutorial.add_box()
-        tutorial.pp_object()
+        # tutorial.pp_object()
 
         # print "============ Press `Enter` to execute a movement using a joint state goal ..."
         # raw_input()
@@ -432,11 +677,11 @@ def main():
 
         print "============ Press `Enter` to Pick ..."
         raw_input()
-        tutorial.pick()
+        tutorial.pick_cartesian([0.59, -0.06])
 
         print "============ Press `Enter` to Place ..."
         raw_input()
-        tutorial.place()
+        tutorial.place_cartesian([0.49, -0.06])
 
         # print "============ Press `Enter` to plan and display a Cartesian path ..."
         # raw_input()
