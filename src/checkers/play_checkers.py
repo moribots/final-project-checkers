@@ -11,29 +11,29 @@ class CheckersAI():
 
     def give_command(self,board,color):
         '''ARGS:
-                board: Board object that stores the positions of the peices on the board, used to check if the move is legal
+                board: Board object that stores the positions of the pieces on the board, used to check if the move is legal
                 color: designates what color the player is, used for get_moves
            Returns:
-                start: Grid position of the peice to move
-                goal: Grid position of where to move the peice to
-                TODO: captured: returns position of any captured peices'''
+                start: Grid position of the piece to move
+                goal: Grid position of where to move the piece to
+                captured: returns position of any captured pieces'''
         valid = False
-        captured = None
+        captured = []
         moves, cap = board.get_moves(color)
         print('Legal Moves: '+str(moves))
         print(cap)
         while not valid:
-            start_in = raw_input('Enter position of peice you want to move or q to quit: ')
+            start_in = raw_input('Enter position of piece you want to move or q to quit: ')
             if start_in == 'q':
                 print('Player quit :(')
                 return None,None,None
-            goal_in = raw_input('Enter where you want to move the peice to: ')
+            goal_in = raw_input('Enter where you want to move the piece to: ')
             start = start_in.split(',')
             goal = goal_in.split(',')
             for i in range(len(start)):
                 try:
-                    start[i] = int(start[i])-1 #convert o python counting convention
-                    goal[i] = int(goal[i])-1 #convert o python counting convention
+                    start[i] = int(start[i])-1 #convert to python counting convention
+                    goal[i] = int(goal[i])-1 #convert to python counting convention
                 except ValueError:
                     print('\nEntered move is not in valid format. Please enter two integers seperated by a comma\n')
                     valid = False
@@ -44,8 +44,7 @@ class CheckersAI():
                     valid = True
                     for c in cap:
                         if start == c[0]:
-                            captured = c[1]
-                            #print('Captured peice at '+str(captured))
+                            captured.append(c[1])
             if not valid:
                 print('\nEntered an illegal move, please enter a different move.\n')
 
@@ -103,35 +102,43 @@ class Board():
 
     def get_moves(self,player):
 
-        def can_jump(r,c,stepr,stepc):
-            capture = None
+        def can_jump(row,col,stepr,stepc):#captured=[]):
+            captured = []
             move = None
-            if c > 5 and stepc > 0: #make sure pawn doesn't try to jump off board
+            cap = False
+            if col > 5 and stepc > 0: #make sure pawn doesn't try to jump off board
                 stepc = -1
-            if self.state[r+(2*stepr)][c+(2*stepc)] == 0 and self.state[r+stepr][c+stepc] == self.not_p:
+            if self.state[row+(2*stepr)][col+(2*stepc)] == 0 and self.state[row+stepr][col+stepc] == self.not_p:
                 #capture condition met
-                move = [[r,c],[r+(2*stepr),c+(2*stepc)]]
-                capture = [[r,c],[r+(stepr),c+(stepc)]]
+                move = [[row,col],[row+(2*stepr),col+(2*stepc)]]
+                captured = [[row,col],[row+(stepr),col+(stepc)]]
+                cap = True
                 if self.p == -1:
                     self.black_piece_count -= 1
                 else:
                     self.red_piece_count -= 1
-            return move,capture
+            return move,captured,cap
 
         def can_step(r,c,stepr,stepc):
             move = None
-            capture = None
-            if self.state[r][c] == self.p:# checks that its players peice
+            capture = []
+            if self.state[r][c] == self.p:# checks that its players piece
                 '''Single Step'''
                 if self.state[r+stepr][c+stepc] == 0: #if the diagonal square is empty
                     move = [[r,c],[r+stepr,c+stepc]]
                 elif r <= 6 and c <= 6: #if not enough space to make a jump
-                    #otherwise make a jump if it is the opponents peice
-                    move, capture = can_jump(r,c,stepr,stepc)
-                    #if r < 3
-
-            #print(move)
-            #print(capture)
+                    #otherwise make a jump if it is the opponents piece
+                    move, cap, cap_success = can_jump(r,c,stepr,stepc) #single jump
+                    capture = [cap]
+                    print(capture)
+                    if cap_success and r < 3:#check for double jump
+                        print('true')
+                        parent = move[0] #save start position from first jump
+                        temp, dcap,cap_success = can_jump(move[1][0],move[1][1],stepr,stepc)#,capture) #double jump
+                        if cap_success:
+                            move = [parent,temp[1]] #return parent from first jump and goal from second jump
+                            capture.append([parent,dcap[1]])
+                            print(capture)
             return move, capture
 
         def flip_board(state):
@@ -174,21 +181,25 @@ class Board():
                         m,cap = can_step(r,c,steps[1][0],steps[1][1])
                         if m != None:
                             moves.append(m)
-                        if cap != None:
-                            capture.append(cap)
+                        for i in range(len(cap)):
+                            if len(cap[i]) != 0:
+                                capture.append(cap[i])
 
                     elif c == 7:
                         m,cap = can_step(r,c,steps[0][0],steps[0][1])
                         if m != None:
                             moves.append(m)
-                        if cap != None:
-                            capture.append(cap)
+                        for i in range(len(cap)):
+                            if len(cap[i]) != 0:
+                                capture.append(cap[i])
                     else:
                         for step in steps:
                             m,cap = can_step(r,c,step[0],step[1])
+                            #print(cap)
                             if m != None:
                                 moves.append(m)
-                            if cap != None:
-                                capture.append(cap)
+                            for i in range(len(cap)):
+                                if len(cap[i]) != 0:
+                                    capture.append(cap[i])
         #print(moves)
         return moves, capture
