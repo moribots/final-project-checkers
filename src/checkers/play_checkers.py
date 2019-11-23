@@ -13,13 +13,16 @@ class CheckersAI():
 
     def give_command(self,board,color):
         '''ARGS:
-                state: Positions of the peices on the board, used to check if the move is legal
+                board: Board object that stores the positions of the peices on the board, used to check if the move is legal
+                color: designates what color the player is, used for get_moves
            Returns:
                 start: Grid position of the peice to move
-                goal: Grid position of where to move the peice to'''
+                goal: Grid position of where to move the peice to
+                TODO: captured: returns position of any captured peices'''
         valid = False
-        #board = Board(state)
+        captured = None
         moves = board.get_moves(color)
+        print(moves)
         while not valid:
             start_in = raw_input('Enter position of peice you want to move(Ex. 3,3 = third column and third row from bottom left corner): ')
             goal_in = raw_input('Enter where you want to move the peice to: ')
@@ -27,16 +30,19 @@ class CheckersAI():
             goal = goal_in.split(',')
             for i in range(len(start)):
                 try:
-                    start[i] = int(start[i])
-                    goal[i] = int(goal[i])
-                    #for move in moves:
-                        #check if legal move
-                    valid = True
+                    start[i] = int(start[i])-1
+                    goal[i] = int(goal[i])-1
                 except ValueError:
                     print('\nEntered move is not in valid format. Please enter two integers seperated by a comma\n')
                     valid = False
+            for move in moves:
+                #check if legal move
+                if [start,goal] == move:
+                    valid = True
+            if not valid:
+                print('\nEntered an illegal move, please enter a different move.\n')
 
-        return start, goal
+        return start, goal, captured
 
     def switch_turn(self):
         '''Sets variable for which players turn it is to the other player'''
@@ -87,8 +93,8 @@ class Board():
         '''Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position.'''
         pass
 
-    def get_moves(self,state,player):
-        self.state = state #currently assuming list
+    def get_moves(self,player):
+        #currently assuming list
         moves = []
         temp = []
         steps = [[1,-1],[1,1]]
