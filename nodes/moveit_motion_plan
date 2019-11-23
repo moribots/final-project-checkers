@@ -5,17 +5,12 @@
 import sys
 import copy
 import rospy
+import numpy as np
 import moveit_commander
 import moveit_msgs.msg
-from moveit_msgs.msg import Grasp
-import geometry_msgs.msg
+from moveit_msgs.msg import Grasp, CollisionObject  # For pickplace
 from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
-import numpy as np
-from std_msgs.msg import String, Bool
-from moveit_commander.conversions import pose_to_list
-import baxter_interface
 from baxter_interface import Gripper, CHECK_VERSION
-from sensor_msgs.msg import Range
 import tf.transformations as tr
 
 
@@ -41,13 +36,6 @@ class PickPlace(object):
             moveit_msgs.msg.DisplayTrajectory,
             queue_size=20)
 
-        self.moving_publisher = rospy.Publisher('amimoving',
-                                                String,
-                                                queue_size=10)
-        rospy.sleep(3.0)
-        # print self.robot.get_current_state()
-        # print ""
-
         # Getting Basic Information
 
         # Get robot reference frame name
@@ -58,10 +46,11 @@ class PickPlace(object):
         rospy.loginfo("========== End effector: %s" % self.eef_link)
         # Get list of all groups in the robot
         self.group_names = self.robot.get_group_names()
-        rospy.loginfo("========== Robot Groups: %s" % self.robot.get_group_names())
+        rospy.loginfo("========== Robot Groups: %s" % self.group_names)
 
         # DEBUG: Print Robot State
         self.robot_state = self.robot.get_current_state()
+        rospy.loginfo("========== CURRENT STATE: %s" % self.robot_state)
 
         # Planning and Execurtion parameters
         self.move_group.set_goal_position_tolerance(0.01)
@@ -79,41 +68,32 @@ class PickPlace(object):
         self.right_gripper.calibrate()
         # Open Gripper
         self.right_gripper.open()
-
-        # self.limb = baxter_interface.Limb('right')
-        # self.angles = self.limb.joint_angles()
-        # self.wave_1 = {'right_s0': -0.459, 'right_s1': -0.202, 'right_e0': 1.807, 'right_e1': 1.714, 'right_w0': -0.906, 'right_w1': -1.545, 'right_w2': -0.276}
-        # rospy.sleep(3)
-        # self.limb.move_to_joint_positions(self.wave_1)
+        # tutorial.right_gripper.close()
 
         # Initialise attribute for desired EE Pose
         self.pose_goal = Pose()
-        # Amount to pull back pre and post grip (approach, retreat)
-        self.standoff = 0.1
 
-        # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+        # Grasp Message
+        self.grasp = Grasp()
 
-        self.moving = '0'
-        self.moving_publisher.publish(self.moving)
+        # Chekcers piece
+        self.puck = CollisionObject()
 
     def add_box(self, timeout=4):
         """
         """
         # Add Objects to Planning Scene
         self.box_name = 'table'
-        box_name = self.box_name
-        scene = self.scene
         self.box_pose = PoseStamped()
         # Can reference to base frame
         # Or can reference to EE finger frame
         # for grasping
         self.box_pose.header.frame_id = "base"
         self.box_pose.pose.position.x = 0.5
-        self.box_pose.pose.position.z = -0.63
+        self.box_pose.pose.position.z = -0.3075
         self.box_pose.pose.orientation.w = 1.0
-        self.scene.add_box(self.box_name, self.box_pose, size=(0.4, 0.5, 0.66))
-
-        self.box_name = box_name
+        # Length, Width, Height
+        self.scene.add_box(self.box_name, self.box_pose, size=(0.6, 0.8, 0.1))
         # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
 
     def attach_box(self, timeout=4):
@@ -235,11 +215,16 @@ class PickPlace(object):
         # Planning to a Pose Goal
         # We can plan a motion for this group to a desired pose for the
         # end-effector:
-        pose_goal = geometry_msgs.msg.Pose()
-        pose_goal.orientation.w = 1.0
+        pose_goal = Pose()
+        # Quaternion from Euler
+        quaternion = tr.quaternion_from_euler(0, -np.pi / 2, 0)
+        pose_goal.orientation.x = quaternion[0]
+        pose_goal.orientation.y = quaternion[1]
+        pose_goal.orientation.z = quaternion[2]
+        pose_goal.orientation.w = quaternion[3]
         pose_goal.position.x = 0.4
-        pose_goal.position.y = 0.1
-        pose_goal.position.z = 0.4
+        pose_goal.position.y = 0.4
+        pose_goal.position.z = -0.15
 
         move_group.set_pose_target(pose_goal)
 
@@ -315,167 +300,106 @@ class PickPlace(object):
         # **Note:** The robot's current joint state must be within some tolerance of the
         # first waypoint in the `RobotTrajectory`_ or ``execute()`` will fail
 
-    def move_arm_standoff(self):
-        self.moving = '1'
-        self.moving_publisher.publish(self.moving)
-        rospy.loginfo("+++++++++++++Going to standoff posistion+++++++++")
-        # def standoff height (above the block)
+    def pick(self):
+        """ DESCRIPTION
 
-        # standoff position has same gripper orentation as block orientation
-        self.pose_goal.orientation = self.quat_orientation
-        # add standoff height to the height of the block and get new pose_goal.position
-        z_standoff = self.z_coord + self.standoff
-        pout = np.array([self.x_coord, self.y_coord, z_standoff])
-        self.pose_goal.position = Point(*pout)
+            Args:
 
-        # Calling Moveit to use IK to compute the plan and execute it
-        print(self.pose_goal)
-        self.move_group.set_pose_goal(self.pose_goal)
-        rospy.sleep(3.0)
-        plan_standoff = self.move_group.go(wait=True)
+            Returns:
+        """
+        # PICK POSE
+        self.grasp.grasp_pose.header.frame_id = "base"
+        # Quaternion from Euler
+        quaternion = tr.quaternion_from_euler(0, -np.pi / 2, 0)
+        self.grasp.grasp_pose.pose.orientation.x = quaternion[0]
+        self.grasp.grasp_pose.pose.orientation.y = quaternion[1]
+        self.grasp.grasp_pose.pose.orientation.z = quaternion[2]
+        self.grasp.grasp_pose.pose.orientation.w = quaternion[3]
+        self.grasp.grasp_pose.pose.position.x = 0.4
+        self.grasp.grasp_pose.pose.position.y = 0.4
+        self.grasp.grasp_pose.pose.position.z = -0.15
 
-        self.move_group.stop()
-        self.move_group.clear_pose_goals()
-        rospy.sleep(1.0)
+        # APPROACH
+        # Defined with respect to frame_id
+        self.grasp.pre_grasp_approach.direction.header.frame_id = "base"
+        # Direction in negative z-axis for pre-grasp direction (up)
+        self.grasp.pre_grasp_approach.direction.vector.z = -1.0
+        self.grasp.pre_grasp_approach.min_distance = 0.095
+        self.grasp.pre_grasp_approach.desired_distance = 0.115
 
-    def move_arm_pick(self):
+        # RETREAT
+        # Defined with respect to frame_id
+        self.grasp.post_grasp_retreat.direction.header.frame_id = "base"
+        # Direction is set as positive z axis
+        self.grasp.post_grasp_retreat.direction.vector.z = 1.0
+        self.grasp.post_grasp_retreat.min_distance = 0.1
+        self.grasp.post_grasp_retreat.desired_distance = 0.25
 
-        rospy.loginfo("+++++++++++++Going to pickup posistion+++++++++")
+        # PRE-GRASP POSTURE
 
-        # standoff position has same gripper orentation and height as block orientation
-        self.pose_goal.orientation = self.quat_orientation
+        # GRASP POSTURE
 
-        z_standoff = self.z_coord
-        pout = np.array([self.x_coord, self.y_coord, z_standoff])
-        self.pose_goal.position = Point(*pout)
+        # Set Support Surface
+        self.move_group.setSupportSurfaceName("table")
+        # Perform pick method using grasp vars
+        self.move_group.pick("puck", self.grasp)
 
-        # Calling Moveit to use IK to compute the plan and execute it
-        print(self.pose_goal)
-        self.move_group.set_pose_goal(self.pose_goal)
-        rospy.sleep(2.0)
-        plan_standoff = self.move_group.go(wait=True)
+    def place(self):
+        """ DESCRIPTION
 
-        print(self.rangestate)
-        if self.rangestate < 0.4:
-            self.right_gripper.close()
-        else:
-            self.right_gripper.open()
-        self.move_group.stop()
-        self.move_group.clear_pose_goals()
-        rospy.sleep(1.0)
+            Args:
 
-    def move_arm_back_standoff(self):
+            Returns:
+        """
+        # PLACE POSE
+        self.grasp.place_pose.header.frame_id = "base"
+        # Quaternion from Euler
+        quaternion = tr.quaternion_from_euler(0, -np.pi / 2, 0)
+        self.grasp.place_pose.pose.orientation.x = quaternion[0]
+        self.grasp.place_pose.pose.orientation.y = quaternion[1]
+        self.grasp.place_pose.pose.orientation.z = quaternion[2]
+        self.grasp.place_pose.pose.orientation.w = quaternion[3]
+        self.grasp.place_pose.pose.position.x = 0.4
+        self.grasp.place_pose.pose.position.y = 0.4
+        self.grasp.place_pose.pose.position.z = -0.15
 
-        rospy.loginfo(
-            "+++++++++++++Going back to stand off posistion+++++++++")
-        self.right_gripper.close()
-        # def standoff height (above the block)
+        # APPROACH
+        # Defined with respect to frame_id
+        self.grasp.pre_place_approach.direction.header.frame_id = "base"
+        # Direction is set as negative z axis
+        self.grasp.pre_place_approach.direction.vector.z = -1.0
+        self.grasp.pre_place_approach.min_distance = 0.095
+        self.grasp.pre_place_approach.desired_distance = 0.115
 
-        # standoff position has same gripper orentation as block orientation
-        self.pose_goal.orientation = self.quat_orientation
-        # add standoff height to the height of the block and get new pose_goal.position
-        z_standoff = self.z_coord + self.standoff
-        pout = np.array([self.x_coord, self.y_coord, z_standoff])
-        self.pose_goal.position = Point(*pout)
+        # RETREAT
+        # Defined with respect to frame_id
+        self.grasp.post_place_retreat.direction.header.frame_id = "base"
+        # Direction is set as negative y axis
+        self.grasp.post_place_retreat.direction.vector.y = -1.0
+        self.grasp.post_place_retreat.min_distance = 0.1
+        self.grasp.post_place_retreat.desired_distance = 0.25
 
-        # Calling Moveit to use IK to compute the plan and execute it
-        print(self.pose_goal)
-        self.move_group.set_pose_goal(self.pose_goal)
-        rospy.sleep(2.0)
-        plan_backtostandoff = self.move_group.go(wait=True)
+        # Set Support Surface
+        self.move_group.setSupportSurfaceName("table")
+        # Perform place method using grasp vars
+        self.move_group.place("puck", self.grasp)
 
-        self.move_group.stop()
-        self.move_group.clear_pose_goals()
-        rospy.sleep(1.0)
+    def pp_object(self):
+        """
+        """
+        # Define the object that we will be manipulating
+        self.puck_pose = PoseStamped()
+        self.puck_name = "puck"
 
-    def move_arm_standoff2(self):
-
-        rospy.loginfo("+++++++++++++Going to standoff2 posistion+++++++++")
-        # def standoff height (above the block)
-        self.right_gripper.close()
-
-        # standoff position has same gripper orentation as block orientation
-        self.pose_goal.orientation = self.quat_orientation
-        # add standoff height to the height of the block and get new pose_goal.position
-        x_standoff2 = self.x_coord
-        z_standoff2 = self.z_coord + self.standoff
-        y_standoff2 = self.y_coord + 0.2
-        pout = np.array([x_standoff2, y_standoff2, z_standoff2])
-        self.pose_goal.position = Point(*pout)
-
-        # Calling Moveit to use IK to compute the plan and execute it
-        print(self.pose_goal)
-        self.move_group.set_pose_goal(self.pose_goal)
-        rospy.sleep(3.0)
-        plan_standoff2 = self.move_group.go(wait=True)
-
-        self.move_group.stop()
-        self.move_group.clear_pose_goals()
-        rospy.sleep(1.0)
-
-    def move_arm_place(self):
-
-        global placedtimes
-        rospy.loginfo("+++++++++++++Going to place posistion+++++++++")
-
-        self.right_gripper.close()
-        # standoff position has same gripper orentation and height as block orientation
-        self.pose_goal.orientation = self.quat_orientation
-
-        # z_standoff=block_height/2  in case need gripper half height higer than predicted block height.
-
-        self.pose_goal.position = self.quat_position
-        self.placetarget_y = np.linspace(0.2, 0.29, 10)
-        x_place = self.x_coord
-        z_place = self.z_coord
-        y_place = self.y_coord + self.placetarget_y[placedtimes]
-
-        pout = np.array([x_place, y_place, z_place])
-        self.pose_goal.position = Point(*pout)
-
-        # Calling Moveit to use IK to compute the plan and execute it
-        print(self.pose_goal)
-        self.move_group.set_pose_goal(self.pose_goal)
-        rospy.sleep(2.0)
-        plan_place = self.move_group.go(wait=True)
-
-        self.right_gripper.open()
-        self.move_group.stop()
-        self.move_group.clear_pose_goals()
-        rospy.sleep(1.0)
-
-    def move_arm_backstandoff2(self):
-        global placedtimes
-        rospy.loginfo(
-            "+++++++++++++Going back to standoff2 posistion+++++++++")
-        # def standoff height (above the block)
-        self.right_gripper.open()
-
-        # standoff position has same gripper orentation as block orientation
-        self.pose_goal.orientation = self.quat_orientation
-        # add standoff height to the height of the block and get new pose_goal.position
-        x_standoff2 = self.x_coord
-        z_standoff2 = self.z_coord + self.standoff
-        y_standoff2 = self.y_coord + self.placetarget_y[placedtimes]
-        pout = np.array([x_standoff2, y_standoff2, z_standoff2])
-        self.pose_goal.position = Point(*pout)
-
-        # Calling Moveit to use IK to compute the plan and execute it
-        print(self.pose_goal)
-        self.move_group.set_pose_goal(self.pose_goal)
-        rospy.sleep(2.0)
-        plan_backstandoff2 = self.move_group.go(wait=True)
-
-        self.move_group.stop()
-        self.move_group.clear_pose_goals()
-        rospy.sleep(1.0)
-        placedtimes += 1
-        self.moving = '0'
-        self.moving_publisher.publish(self.moving)
-
-
-placedtimes = 0
-
+        # Can reference to base frame
+        # Or can reference to EE finger frame
+        # for grasping
+        self.puck_pose.header.frame_id = "base"
+        self.puck_pose.pose.position.x = 0.5
+        self.puck_pose.pose.position.z = -0.3075 + 0.05
+        self.puck_pose.pose.orientation.w = 1.0
+        # TODO: Change to Cylinder
+        self.scene.add_box(self.puck_name, self.puck_pose, size=(25e-3, 25e-3, 10e-3))
 
 def main():
     rospy.init_node("moveit_motion_plan", anonymous=True)
@@ -492,13 +416,11 @@ def main():
         print "----------------------------------------------------------"
         print "Press Ctrl-D to exit at any time"
         print ""
-        print "============ Press `Enter` to begin the tutorial by setting up the moveit_commander ..."
-        raw_input()
         tutorial = PickPlace()
 
-        print "============ Press `Enter` to add a box to the planning scene ..."
-        raw_input()
+        print "============ Add a box and checkers piece to the planning scene ..."
         tutorial.add_box()
+        tutorial.pp_object()
 
         # print "============ Press `Enter` to execute a movement using a joint state goal ..."
         # raw_input()
@@ -508,7 +430,13 @@ def main():
         raw_input()
         tutorial.go_to_pose_goal()
 
-        tutorial.right_gripper.close()
+        print "============ Press `Enter` to Pick ..."
+        raw_input()
+        tutorial.pick()
+
+        print "============ Press `Enter` to Place ..."
+        raw_input()
+        tutorial.place()
 
         # print "============ Press `Enter` to plan and display a Cartesian path ..."
         # raw_input()
