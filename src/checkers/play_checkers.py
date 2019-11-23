@@ -1,6 +1,4 @@
 
-
-
 class CheckersAI():
     '''Keeps track of game progress and uses Minimax with alpha beta pruning to find best move for the Baxter robot'''
     def __init__(self):
@@ -22,25 +20,29 @@ class CheckersAI():
         valid = False
         captured = None
         moves = board.get_moves(color)
-        print(moves)
         while not valid:
-            start_in = raw_input('Enter position of peice you want to move(Ex. 3,3 = third column and third row from bottom left corner): ')
+            start_in = raw_input('Enter position of peice you want to move or q to quit: ')
+            if start_in == 'q':
+                print('Player quit :(')
+                return None,None,None
             goal_in = raw_input('Enter where you want to move the peice to: ')
             start = start_in.split(',')
             goal = goal_in.split(',')
             for i in range(len(start)):
                 try:
-                    start[i] = int(start[i])-1
-                    goal[i] = int(goal[i])-1
+                    start[i] = int(start[i])-1 #convert o python counting convention
+                    goal[i] = int(goal[i])-1 #convert o python counting convention
                 except ValueError:
                     print('\nEntered move is not in valid format. Please enter two integers seperated by a comma\n')
                     valid = False
             for move in moves:
                 #check if legal move
                 if [start,goal] == move:
+                    print('Moving...')
                     valid = True
             if not valid:
                 print('\nEntered an illegal move, please enter a different move.\n')
+
 
         return start, goal, captured
 
@@ -94,16 +96,43 @@ class Board():
         pass
 
     def get_moves(self,player):
+
+        def can_step(r,c,state,player,not_player,stepr,stepc):
+            move = None
+            if state[r][c] == player:# checks that its players peice
+                '''Single Step'''
+                if state[r+stepr][c+stepc] == 0: #if the diagonal square is empty
+                    move = [[r,c],[r+stepr,c+stepc]]
+                elif r < 5 and c < 5: #if not enough space to make a jump
+                    #otherwise make a jump if it is the opponents peice
+                    if state[r+(2*stepr)][c+(2*stepc)] == 0 and state[r+stepr][c+stepc] == not_player:
+                        #capture condition met
+                        move = [[r,c],[r+(2*stepr),c+(2*stepc)]]
+                        capture = [[r,c],[r+(stepr),c+(stepc)]]
+                        if p == -1:
+                            self.black_piece_count -= 1
+                        else:
+                            self.red_piece_count -= 1
+            return move
+
+        def flip_board(state):
+            flip_state = state[::-1]
+            for l in range(len(flip_state)):
+                #print(l)
+                flip_state[l] = flip_state[l][::-1]
+            return flip_state
+
         #currently assuming list
         moves = []
         temp = []
         steps = [[1,-1],[1,1]]
         #print(self.state[0])
-        if player == 'Black': #may need to flip board based on player
+        if player == 'Black': #state is always read in starting with dark color first
             #Black is -1
             p = -1
             not_p = 1
         else:
+            self.state = flip_board(self.state)
             p = 1 #Red is +1
             not_p = -1
         #cycle through grid cells
@@ -122,30 +151,17 @@ class Board():
                                 print('out of bounds')
                 else:
                     if c == 0: #can only move toward center of board
-                        if self.state[r][c] == p:# checks that its players peice
-                            if self.state[r+steps[1][0]][c+steps[1][1]] == 0: #if the diagonal square is empty
-                                moves.append([[r,c],[r+steps[1][0],c+steps[1][1]]])
-                            elif r < 5 and c < 5: #if can't make a double jump
-                                #otherwise make a double jump if it is the opponents peice
-                                if self.state[r+(2*steps[1][0])][c+(2*steps[1][1])] == 0 and self.state[r+steps[1][0]][c+steps[1][1]] == not_p:
-                                    moves.append([[r,c],[r+(2*steps[1][0]),c+(2*steps[1][1])]])
-
+                        temp = can_step(r,c,self.state,p,not_p,steps[1][0],steps[1][1])
+                        if temp != None:
+                            moves.append(temp)
                     elif c == 7:
-                        if self.state[r][c] == p:
-                            if self.state[r+steps[0][0]][c+steps[0][1]] == 0:
-                                moves.append([[r,c],[r+steps[0][0],c+steps[0][1]]])
-                            elif r < 5 and c < 5:
-                                if self.state[r+(2*steps[0][0])][c+(2*steps[0][1])] == 0 and self.state[r+steps[0][0]][c+steps[0][1]] == not_p:
-                                    moves.append([[r,c],[r+(2*steps[0][0]),c+(2*steps[0][1])]])
+                        temp = can_step(r,c,self.state,p,not_p,steps[0][0],steps[0][1])
+                        if temp != None:
+                            moves.append(temp)
                     else:
                         for step in steps:
-                            if self.state[r][c] == p:
-                                #print(r,c,self.state[r][c])
-                                if self.state[r+step[0]][c+step[1]] == 0:
-                                    moves.append([[r,c],[r+step[0],c+step[1]]])
-                                elif r < 5 and c <5:
-                                    #print(r)
-                                    if self.state[r+(2*step[0])][c+(2*step[1])] == 0 and self.state[r+step[0]][c+step[1]] == not_p:
-                                        moves.append([[r,c],[r+(2*step[0]),c+(2*step[1])]])
+                            temp = can_step(r,c,self.state,p,not_p,step[0],step[1])
+                            if temp != None:
+                                moves.append(temp)
         #print(moves)
-        return(np.array(moves))
+        return(moves)
