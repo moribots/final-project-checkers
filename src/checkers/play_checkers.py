@@ -19,7 +19,9 @@ class CheckersAI():
                 TODO: captured: returns position of any captured peices'''
         valid = False
         captured = None
-        moves = board.get_moves(color)
+        moves, cap = board.get_moves(color)
+        print('Legal Moves: '+str(moves))
+        print(cap)
         while not valid:
             start_in = raw_input('Enter position of peice you want to move or q to quit: ')
             if start_in == 'q':
@@ -40,6 +42,10 @@ class CheckersAI():
                 if [start,goal] == move:
                     print('Moving...')
                     valid = True
+                    for c in cap:
+                        if start == c[0]:
+                            captured = c[1]
+                            #print('Captured peice at '+str(captured))
             if not valid:
                 print('\nEntered an illegal move, please enter a different move.\n')
 
@@ -97,23 +103,36 @@ class Board():
 
     def get_moves(self,player):
 
-        def can_step(r,c,state,player,not_player,stepr,stepc):
+        def can_jump(r,c,stepr,stepc):
+            capture = None
             move = None
-            if state[r][c] == player:# checks that its players peice
+            if c > 5 and stepc > 0: #make sure pawn doesn't try to jump off board
+                stepc = -1
+            if self.state[r+(2*stepr)][c+(2*stepc)] == 0 and self.state[r+stepr][c+stepc] == self.not_p:
+                #capture condition met
+                move = [[r,c],[r+(2*stepr),c+(2*stepc)]]
+                capture = [[r,c],[r+(stepr),c+(stepc)]]
+                if self.p == -1:
+                    self.black_piece_count -= 1
+                else:
+                    self.red_piece_count -= 1
+            return move,capture
+
+        def can_step(r,c,stepr,stepc):
+            move = None
+            capture = None
+            if self.state[r][c] == self.p:# checks that its players peice
                 '''Single Step'''
-                if state[r+stepr][c+stepc] == 0: #if the diagonal square is empty
+                if self.state[r+stepr][c+stepc] == 0: #if the diagonal square is empty
                     move = [[r,c],[r+stepr,c+stepc]]
-                elif r < 5 and c < 5: #if not enough space to make a jump
+                elif r <= 6 and c <= 6: #if not enough space to make a jump
                     #otherwise make a jump if it is the opponents peice
-                    if state[r+(2*stepr)][c+(2*stepc)] == 0 and state[r+stepr][c+stepc] == not_player:
-                        #capture condition met
-                        move = [[r,c],[r+(2*stepr),c+(2*stepc)]]
-                        capture = [[r,c],[r+(stepr),c+(stepc)]]
-                        if p == -1:
-                            self.black_piece_count -= 1
-                        else:
-                            self.red_piece_count -= 1
-            return move
+                    move, capture = can_jump(r,c,stepr,stepc)
+                    #if r < 3
+
+            #print(move)
+            #print(capture)
+            return move, capture
 
         def flip_board(state):
             flip_state = state[::-1]
@@ -125,22 +144,23 @@ class Board():
         #currently assuming list
         moves = []
         temp = []
+        capture = []
         steps = [[1,-1],[1,1]]
         #print(self.state[0])
         if player == 'Black': #state is always read in starting with dark color first
             #Black is -1
-            p = -1
-            not_p = 1
+            self.p = -1
+            self.not_p = 1
         else:
             self.state = flip_board(self.state)
-            p = 1 #Red is +1
-            not_p = -1
+            self.p = 1 #Red is +1
+            self.not_p = -1
         #cycle through grid cells
         for r in range(8):
             for c in range(8):
                 #print(r,c)
                 if r == 7:#only kings can move
-                    if self.state[r][c] == p*2 and p*2 != not_p*2:
+                    if self.state[r][c] == self.p*2 and self.p*2 != self.not_p*2:
                         for step in self.king_steps:
                             try:
                                 print([[self.state[r][c]],[self.state[r+step[0][0]][c+step[0][1]]]])
@@ -151,17 +171,24 @@ class Board():
                                 print('out of bounds')
                 else:
                     if c == 0: #can only move toward center of board
-                        temp = can_step(r,c,self.state,p,not_p,steps[1][0],steps[1][1])
-                        if temp != None:
-                            moves.append(temp)
+                        m,cap = can_step(r,c,steps[1][0],steps[1][1])
+                        if m != None:
+                            moves.append(m)
+                        if cap != None:
+                            capture.append(cap)
+
                     elif c == 7:
-                        temp = can_step(r,c,self.state,p,not_p,steps[0][0],steps[0][1])
-                        if temp != None:
-                            moves.append(temp)
+                        m,cap = can_step(r,c,steps[0][0],steps[0][1])
+                        if m != None:
+                            moves.append(m)
+                        if cap != None:
+                            capture.append(cap)
                     else:
                         for step in steps:
-                            temp = can_step(r,c,self.state,p,not_p,step[0],step[1])
-                            if temp != None:
-                                moves.append(temp)
+                            m,cap = can_step(r,c,step[0],step[1])
+                            if m != None:
+                                moves.append(m)
+                            if cap != None:
+                                capture.append(cap)
         #print(moves)
-        return(moves)
+        return moves, capture
