@@ -20,12 +20,12 @@ class CheckersAI():
         valid = False
         captured = []
         moves, cap = board.get_moves(color)
-        print('Legal Moves: '+str(moves))
-        print(cap)
+        #print('Legal Moves: '+str(moves))
+        #print(cap)
         while not valid:
             start_in = raw_input('Enter position of piece you want to move or q to quit: ')
             if start_in == 'q':
-                print('Player quit :(')
+                print('Player quit')
                 return None,None,None
             goal_in = raw_input('Enter where you want to move the piece to: ')
             start = start_in.split(',')
@@ -102,16 +102,16 @@ class Board():
 
     def get_moves(self,player):
 
-        def can_jump(row,col,stepr,stepc):#captured=[]):
+        def can_jump(row,col,stepc):#,stepc):
             captured = []
-            move = None
+            move = []
             cap = False
             if col > 5 and stepc > 0: #make sure pawn doesn't try to jump off board
                 stepc = -1
-            if self.state[row+(2*stepr)][col+(2*stepc)] == 0 and self.state[row+stepr][col+stepc] == self.not_p:
+            if self.state[row+(2*self.step_r)][col+(2*stepc)] == 0 and self.state[row+self.step_r][col+stepc] == self.not_p:
                 #capture condition met
-                move = [[row,col],[row+(2*stepr),col+(2*stepc)]]
-                captured = [[row,col],[row+(stepr),col+(stepc)]]
+                move = [[row,col],[row+(2*self.step_r),col+(2*stepc)]]
+                captured = [[row,col],[row+(self.step_r),col+(stepc)]]
                 cap = True
                 if self.p == -1:
                     self.black_piece_count -= 1
@@ -119,32 +119,50 @@ class Board():
                     self.red_piece_count -= 1
             return move,captured,cap
 
-        def can_step(r,c,stepr,stepc):
-            move = None
+        def can_step(r,c,step):
+        ''' Args:
+                r: current row index
+                c: current column index
+                step: either 1,-1, or both, states which direction side to side the piece can move diagonally
+            Returns:
+                moves: list of (start, goal) pairs (if any) of legal moves
+                capture: list of (start,captured piece position) pairs of any captured pieces'''
+            moves = []
             capture = []
-            if self.state[r][c] == self.p:# checks that its players piece
-                '''Single Step'''
-                if self.state[r+stepr][c+stepc] == 0: #if the diagonal square is empty
-                    move = [[r,c],[r+stepr,c+stepc]]
-                elif r <= 6 and c <= 6: #if not enough space to make a jump
-                    #otherwise make a jump if it is the opponents piece
-                    move, cap, cap_success = can_jump(r,c,stepr,stepc) #single jump
-                    capture = [cap]
-                    print(capture)
-                    if cap_success and r < 3:#check for double jump
-                        print('true')
-                        parent = move[0] #save start position from first jump
-                        temp, dcap,cap_success = can_jump(move[1][0],move[1][1],stepr,stepc)#,capture) #double jump
-                        if cap_success:
-                            move = [parent,temp[1]] #return parent from first jump and goal from second jump
-                            capture.append([parent,dcap[1]])
-                            print(capture)
-            return move, capture
+
+            for s in step: #try to take a step in valid directions
+                stepc = self.step_r*s
+                #print(stepc)
+                if self.state[r][c] == self.p and c <= 6:# checks that its players piece
+                    '''Single Step'''
+
+                    if self.state[r+self.step_r][c+stepc] == 0: #if the diagonal square is empty, add to list of legal moves
+                        moves.append([[r,c],[r+self.step_r,c+stepc]])
+                    elif r <= 6 : #if enough space to make a jump
+                        #make a jump if it is the opponents piece
+                        move, cap, cap_success = can_jump(r,c,stepc) #single jump
+                        moves = [move]
+                        if len(cap) != 0:
+                            capture = [cap]
+                        '''Double jump'''
+                        if cap_success and r < 3:#check for double jump
+                            for s2 in step:
+                                stepc2 = self.step_r*s2
+                                parent = move[0] #save start position from first jump
+                                temp, dcap,cap_success = can_jump(move[1][0],move[1][1],stepc2) #double jump
+                                if cap_success:
+                                    moves.append([parent,temp[1]]) #return parent from first jump and goal from second jump
+                                    capture.append([parent,dcap[1]])
+            return moves, capture
 
         def flip_board(state):
+            '''Args:
+                 state: a array representation of a board state.
+               Returns:
+                 flip_state: the same board with the first index corresponding to the corner diagonally opposite.
+                Flips the board so the board is in the perspective of whichever players turn it is'''
             flip_state = state[::-1]
             for l in range(len(flip_state)):
-                #print(l)
                 flip_state[l] = flip_state[l][::-1]
             return flip_state
 
@@ -153,7 +171,7 @@ class Board():
         temp = []
         capture = []
         steps = [[1,-1],[1,1]]
-        #print(self.state[0])
+        self.step_r = 1
         if player == 'Black': #state is always read in starting with dark color first
             #Black is -1
             self.p = -1
@@ -165,7 +183,6 @@ class Board():
         #cycle through grid cells
         for r in range(8):
             for c in range(8):
-                #print(r,c)
                 if r == 7:#only kings can move
                     if self.state[r][c] == self.p*2 and self.p*2 != self.not_p*2:
                         for step in self.king_steps:
@@ -178,28 +195,29 @@ class Board():
                                 print('out of bounds')
                 else:
                     if c == 0: #can only move toward center of board
-                        m,cap = can_step(r,c,steps[1][0],steps[1][1])
-                        if m != None:
-                            moves.append(m)
+                        m,cap = can_step(r,c,[1])
+                        for i in range(len(m)):
+                            if len(m[i]) != 0:
+                                moves.append(m[i])
                         for i in range(len(cap)):
                             if len(cap[i]) != 0:
                                 capture.append(cap[i])
 
-                    elif c == 7:
-                        m,cap = can_step(r,c,steps[0][0],steps[0][1])
-                        if m != None:
-                            moves.append(m)
+                    elif c == 7: #can only move toward center of board
+                        m,cap = can_step(r,c,[-1])
+                        for i in range(len(m)):
+                            if len(m[i]) != 0:
+                                moves.append(m[i])
                         for i in range(len(cap)):
                             if len(cap[i]) != 0:
                                 capture.append(cap[i])
-                    else:
-                        for step in steps:
-                            m,cap = can_step(r,c,step[0],step[1])
-                            #print(cap)
-                            if m != None:
-                                moves.append(m)
-                            for i in range(len(cap)):
-                                if len(cap[i]) != 0:
-                                    capture.append(cap[i])
+                    else: #can move diagonally in either direction side to side
+                        m,cap = can_step(r,c,[1,-1])
+                        for i in range(len(m)):
+                            if len(m[i]) != 0:
+                                moves.append(m[i])
+                        for i in range(len(cap)):
+                            if len(cap[i]) != 0:
+                                capture.append(cap[i])
         #print(moves)
         return moves, capture
