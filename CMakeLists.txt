@@ -166,6 +166,7 @@ include_directories(
  install(PROGRAMS
 #   scripts/my_python_script
    nodes/moveit_motion_plan
+   nodes/pickplace_as
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 

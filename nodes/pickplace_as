@@ -1,0 +1,439 @@
+#!/usr/bin/env python
+""" 
+REFERENCE: https://github.com/ros-planning/moveit_tutorials/blob/master/doc/move_group_python_interface/scripts/move_group_python_interface_tutorial.py
+
+DESCRIPTION: The Pick Place Action Server
+
+
+SUBSCRIBERS:
+
+SERVICES:
+"""
+
+import rospy
+import actionlib
+import sys
+import copy
+import numpy as np
+import moveit_commander
+import moveit_msgs.msg
+from moveit_msgs.msg import Grasp, PlaceLocation  # For pickplace
+from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
+import baxter_interface
+from baxter_interface import Gripper, CHECK_VERSION
+import tf.transformations as tr
+from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
+
+
+class PickPlace():
+
+    def __init__(self):
+        # Initialise
+        rospy.loginfo("Initializing Baxter with MoveIt!")
+        # Initialize moveit_commander with kin model
+        # and current joint states
+        # This remap is important because otherwise it is impossible
+        # to read the robot's End Effector Pose. The launchfile
+        # Also must have this remap
+        joint_state_topic = ['joint_states:=/robot/joint_states']
+        moveit_commander.roscpp_initialize(joint_state_topic)
+        # roscpp_initialize(sys.argv)
+        # joint_state_topic = ['joint_states:=/joint_states_desired']
+        # moveit_commander.roscpp_initialize(joint_state_topic)
+        # moveit_commander.roscpp_initialize(sys.argv)
+        self.robot = moveit_commander.RobotCommander()
+        # Remote interface for getting, setting and updating
+        # robot's belief of surroundings
+        self.scene = moveit_commander.PlanningSceneInterface()
+        # Interface used to execute motions
+        self.move_group = moveit_commander.MoveGroupCommander("right_arm")
+
+        # Display Trajectory in RVIZ
+        self.display_trajectory_publisher = rospy.Publisher(
+            '/move_group/display_planned_path',
+            moveit_msgs.msg.DisplayTrajectory,
+            queue_size=20)
+
+        # Getting Basic Information
+        # Get robot reference frame name
+        self.planning_frame = self.move_group.get_planning_frame()
+        rospy.loginfo("========== Reference frame: %s" % self.planning_frame)
+        # Get End Effector link name for this group
+        self.eef_link = self.move_group.get_end_effector_link()
+        rospy.loginfo("========== End effector: %s" % self.eef_link)
+        # Get list of all groups in the robot
+        self.group_names = self.robot.get_group_names()
+        rospy.loginfo("========== Robot Groups: %s" % self.group_names)
+
+        # DEBUG: Print Robot State
+        self.robot_state = self.robot.get_current_state()
+        rospy.loginfo("========== CURRENT STATE: %s" % self.robot_state)
+
+        # Planning and Execurtion parameters
+        self.move_group.set_goal_position_tolerance(0.01)
+        self.move_group.set_goal_orientation_tolerance(0.01)
+        self.move_group.set_planning_time(5.0)
+        self.move_group.allow_replanning(True)
+        self.move_group.set_max_velocity_scaling_factor(0.6)
+        self.move_group.set_max_acceleration_scaling_factor(0.6)
+
+        # State Gripper (L or R)
+        self.right_gripper = Gripper('right', CHECK_VERSION)
+        # Reboot Gripper
+        self.right_gripper.reboot()
+        # Calibrate Gripper
+        self.right_gripper.calibrate()
+        # Open Gripper
+        self.right_gripper.open()
+
+        # Standoff is the amount by which we approach
+        # and retreat pre and post grasp
+        self.standoff = 0.1
+
+        # z is the z position of the objects we want to grasp
+        # set to the table z origin plus half the table height
+        # self.z_org is the z origin
+        self.z_org = -0.331
+        self.z = self.z_org + 0.05
+
+        # Add table as collision object
+        self.add_box()
+
+        # Initialise action server
+        rospy.loginfo("Initialising action server!")
+        self.asrv = actionlib.SimpleActionServer("pick_place_as", PickPlaceAction, execute_cb=self.execute_cb, auto_start=False)
+        # Start action server
+        self.asrv.start()
+
+    def add_box(self, timeout=4):
+        """ Adds a box to the Planning Scene
+            so that Baxter knows to avoid it with
+            all its links as its IK solver finds a
+            solution for a given motion plan
+        """
+        # Add Objects to Planning Scene
+        self.box_name = 'table'
+        self.box_pose = PoseStamped()
+        # Can reference to base frame
+        # Or can reference to EE finger frame
+        # for grasping
+        self.box_pose.header.frame_id = "base"
+        self.box_pose.pose.position.x = 0.5
+        self.box_pose.pose.position.z = self.z_org
+        self.box_pose.pose.orientation.w = 1.0
+        # Length, Width, Height
+        self.scene.add_box(self.box_name, self.box_pose, size=(0.6, 0.8, 0.1))
+        # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+
+    def go_to_pose_goal(self, goal=[0.5, 0.0]):
+        """ This function is called to bring the EE to its
+            home position, or to actuate it in case the cartesian
+            planner fails to return a solution that traces the
+            desired trajectory to a minimum threshold
+
+            Args: goal, a 2-element list with an x and y
+            component which comprise the goal coordinates in
+            the x-y plane.
+
+            Returns: Moves the robobt arm to (goal[0], goal[1], 0)
+        """
+        move_group = self.move_group
+        # Planning to a Pose Goal
+        # We can plan a motion for this group to a desired pose for the
+        # end-effector:
+        pose_goal = Pose()
+        # Quaternion from Euler
+        # quaternion = tr.quaternion_from_euler(0, np.pi / 2, 0, 'sxyz')
+        # rospy.loginfo("QUATERNION FOUND {}".format(quaternion))
+        # Make the EE point down
+        pose_goal.orientation.x = 1
+        pose_goal.orientation.y = 0
+        pose_goal.orientation.z = 0
+        pose_goal.orientation.w = 0
+        pose_goal.position.x = goal[0]
+        pose_goal.position.y = goal[1]
+        pose_goal.position.z = 0.0
+
+        # Set the pose target
+        move_group.set_pose_target(pose_goal)
+        # Now, we call the planner to compute the plan and execute it.
+        move_group.go(wait=True)
+        # Calling `stop()` ensures that there is no residual movement
+        move_group.stop()
+        # It is always good to clear your targets after planning with poses.
+        # Note: there is no equivalent function for clear_joint_value_targets()
+        move_group.clear_pose_targets()
+        # For testing:
+        # current_pose = self.move_group.get_current_pose().pose
+
+    def pick_cartesian(self, goal, feedback):
+        """ Receives a pick goal and performs 4 actions:
+
+            1 - Moves to a pre-grasp position (approach) in the
+            x-y position of the supplied goal, but offset in the z
+            axis. This is done using the plan_cartesian_path method
+            which is supplied a set of waypoints linearly interpolating
+            between the EE's current pose and its desired pose, with
+            the final waypoint having the EE pointing down.
+
+            2- Moves to the grasp position by changing the EE z position
+            using the plan_cartesian_path method.
+
+            3- Closes the grippers to grasp the object
+
+            4- Moves to a post-grasp (retreat) position in the x-y position
+            of the supplied goal but offset in the z axis. This is done using
+            the plan_cartesian_path method.
+
+            Note that if we force the trajectory to have the EE point down at
+            each waypoint, its odds of solving are greatly reduced, so we only
+            place this constraint on the last waypoint.
+
+            Args: goal (list of two elements, x and y goal position)
+
+            Returns: Performs approach, grasp, and retreat actions and pubs
+            		 completed_moves feedback in realtime
+            		 also returns status: "succeeded" or "compromised" for
+            		 result return
+        """
+        # path_type counter, if more than one is "pose", return compromised
+        comp_count = 0
+        # APPROACH GOAL
+        rospy.loginfo("================== Approach ==============")
+        # Pass the goal and the approach z coordinate
+        path_type = self.create_path(goal, self.z + self.standoff)
+        if path_type == "pose":
+        	comp_count += 1
+        # Publish feedback
+        feedback.completed_moves.append("pick_approach")
+        self.asrv.publish_feedback(feedback)
+
+        # GRASP GOAL
+        rospy.loginfo("================== Grasp ==============")
+        # Pass the goal and the grasp z coordinate
+        path_type = self.create_path(goal, self.z)
+        if path_type == "pose":
+        	comp_count += 1
+
+        # Close Gripper to grasp
+        self.right_gripper.close()
+        rospy.sleep(0.5)
+        # Publish feedback
+        feedback.completed_moves.append("pick")
+        self.asrv.publish_feedback(feedback)
+
+        # RETREAT GOAL (same as approach)
+        rospy.loginfo("================== Retreat ==============")
+        # Pass the goal and the retreat z coordinate
+        path_type = self.create_path(goal, self.z + self.standoff)
+        if path_type == "pose":
+        	comp_count += 1
+        # Publish feedback
+        feedback.completed_moves.append("pick_retreat")
+        self.asrv.publish_feedback(feedback)
+
+        # Return status for Action result
+        status = ""
+        if comp_count == 0:
+        	status = "succeeded"
+        else:
+        	status = "compromised"
+        return status
+
+    def place_cartesian(self, goal, feedback):
+        """ Receives a place goal and performs 4 actions:
+
+            1 - Moves to a pre-place position (approach) in the
+            x-y position of the supplied goal, but offset in the z
+            axis. This is done using the plan_cartesian_path method
+            which is supplied a set of waypoints linearly interpolating
+            between the EE's current pose and its desired pose, with
+            the final waypoint having the EE pointing down.
+
+            2- Moves to the place position by changing the EE z position
+            using the plan_cartesian_path method.
+
+            3- Opens the grippers to place/release the object
+
+            4- Moves to a post-place (retreat) position in the x-y position
+            of the supplied goal but offset in the z axis. This is done using
+            the plan_cartesian_path method.
+
+            Note that if we force the trajectory to have the EE point down at
+            each waypoint, its odds of solving are greatly reduced, so we only
+            place this constraint on the last waypoint.
+
+            Args: goal (list of two elements, x and y goal position)
+
+            Returns: Performs approach, grasp, and retreat actions and pubs
+            		 completed_moves feedback in realtime
+            		 also returns status: "succeeded" or "compromised" for
+            		 result return
+        """
+        # path_type counter, if more than one is "pose", return compromised
+        comp_count = 0
+        # APPROACH GOAL
+        rospy.loginfo("================== Approach ==============")
+        # Pass the goal and the approach z coordinate
+        path_type = self.create_path(goal, self.z + self.standoff)
+        if path_type == "pose":
+        	comp_count += 1
+        # Publish feedback
+        feedback.completed_moves.append("place_approach")
+        self.asrv.publish_feedback(feedback)
+
+        # RELEASE GOAL
+        rospy.loginfo("================== Release ==============")
+        # Pass the goal and the release z coordinate
+        path_type = self.create_path(goal, self.z)
+        if path_type == "pose":
+        	comp_count += 1
+
+        # Close Gripper to grasp
+        self.right_gripper.open()
+        rospy.sleep(0.5)
+        # Publish feedback
+        feedback.completed_moves.append("place")
+        self.asrv.publish_feedback(feedback)
+
+        # RETREAT GOAL (same as approach)
+        rospy.loginfo("================== Retreat ==============")
+        # Pass the goal and the release z coordinate
+        path_type = self.create_path(goal, self.z + self.standoff)
+        if path_type == "pose":
+        	comp_count += 1
+        # Publish feedback
+        feedback.completed_moves.append("place_retreat")
+        self.asrv.publish_feedback(feedback)
+
+        # Return status for Action result
+        status = ""
+        if comp_count== 0:
+        	status = "succeeded"
+        else:
+        	status = "compromised"
+        return status
+
+    def create_path(self, goal, z, iter=20):
+        """ Creates list of waypoint poses that make up cartesian
+            path.
+
+            Args: goal (two-element list of an x and y position)
+
+            z (z coordinate of the goal position, which may or may
+            not contain the standoff offset)
+
+            iter (number of waypoints in the listt)
+
+            Returns: waypoints
+
+            Passes: goal
+        """
+        # Get Current EE Pose
+        ee_pose = self.move_group.get_current_pose().pose
+        # Initialise list of waypoitns
+        waypoints = []
+        # Linearly interpolate between current and goal poses
+        xiter = np.linspace(ee_pose.position.x, goal[0], iter)
+        yiter = np.linspace(ee_pose.position.y, goal[1], iter)
+        # z may or may not contain the standoff offset
+        ziter = np.linspace(ee_pose.position.z, z, iter)
+        # Set each trajectory element
+        for i in range(iter):
+            p = copy.deepcopy(ee_pose)
+            p.position.x = xiter[i]
+            p.position.y = yiter[i]
+            p.position.z = ziter[i]
+            # Point Down for the final waypoint
+            if i >= iter - 1:
+                p.orientation.x = 1
+            waypoints.append(p)
+        # Now plan and move
+        path_type = self.plan_cartesian_path(waypoints, goal)
+        rospy.sleep(0.5)
+
+        return path_type
+
+    def plan_cartesian_path(self, waypoints, goal):
+        """ Calls compute_cartesian_path method from the
+            move_group object to create a constrained path
+            for the EE to follow. This is done in multiple attempts
+            untill a satisfactory path is found and executed. Paths
+            are assessed by their completion of the desired trajectory.
+
+            If a path is not found to a certain standard, the go_to_pose_goal
+            method is instread called, which sends the EE to the goal, albeit
+            with an unconstrained path. This is a worst-case scenario.
+
+            Args: waypoints (list of poses for the EE to mmove through
+            during the cartesian path)
+
+            goal (two-element list containing an x and y position for the EE)
+
+            Returns: creates and executes path
+        """
+        # Scale = -1 for python according to tutorial
+        # You can plan a Cartesian path by specifying a list of waypoints
+        # for the end-effector to go through:
+        self.move_group.set_start_state_to_current_state()
+        fraction = 0.0
+        max_attempts = 50
+        attempts = 0
+
+        # Return path_type variable which tells whether cartesian planner has worked
+        path_type = ""
+
+        # Plan the Cartesian path connecting the waypoints
+        # We want the Cartesian path to be interpolated at a resolution of 1 cm
+        # which is why we will specify 0.01 as the eef_step in Cartesian
+        # translation.  Disable jump thresh by setting it to 0.0
+        # waypoints to follow, eef_step, jump_threshold
+        while fraction <= 0.8 and attempts < max_attempts:
+            plan, fraction = self.move_group.compute_cartesian_path(waypoints, 0.01, 0.0)
+            # Increment the number of attempts
+            attempts += 1
+        # If we have a complete plan, execute the trajectory
+        if fraction >= 0.8:
+            rospy.loginfo("Path computed successfully. Moving the arm.")
+            self.move_group.execute(plan, wait=True)
+            path_type = "cartesian"
+
+        else:
+            rospy.logerr("Could not find valid cartesian path")
+            # Go back to start
+            self.go_to_pose_goal(goal)
+            path_type = "pose"
+
+        return path_type
+
+    def execute_cb(self, goal):
+    	""" DESCRIPTION:
+
+    		Args:
+
+    		Returns
+    	"""
+    	# Feedback and Result for Action
+    	print("Goal Received")
+    	feedback = PickPlaceFeedback()
+        result = PickPlaceResult()
+
+    	# Execute Pick Routine
+    	pick_status = self.pick_cartesian(goal.pick_goal, feedback)
+
+    	# Execute Place Routine
+    	place_status = self.place_cartesian(goal.place_goal, feedback)
+
+    	# Return result
+    	if pick_status == "compromised" or place_status == "compromised":
+    		result.status = "compromised"
+    	else:
+    		result.status = "succeeded"
+    	# Return result
+    	self.asrv.set_succeeded(result)
+
+
+if __name__ == "__main__":
+    rospy.init_node("pickplace_as")
+    pp = PickPlace()
+    rospy.spin()

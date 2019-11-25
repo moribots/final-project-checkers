@@ -3,8 +3,8 @@
     <node name="joint_trajectory_action_server" pkg="baxter_interface" type="joint_trajectory_action_server.py" />
 
     <include file="$(find baxter_moveit_config)/launch/baxter_grippers.launch"/>
-
-    <node name="moveit_motion_plan" pkg="checkers" type="moveit_motion_plan" output="screen" />
+  <!-- pick place action server -->
+    <node name="pickplace_as" pkg="checkers" type="pickplace_as" output="screen" />
     
 
 </launch>
