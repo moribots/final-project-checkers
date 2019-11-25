@@ -23,7 +23,6 @@ import tf.transformations as tr
 from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
 from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
 
-
 class PickPlace():
     def __init__(self):
         # Initialise
@@ -98,7 +97,7 @@ class PickPlace():
         self.add_box()
 
         # Go to home position
-        self.go_to_pose_goal()
+        self.go_to_joint_state()
 
         # Initialise action server
         rospy.loginfo("Initialising action server...")
@@ -129,6 +128,26 @@ class PickPlace():
         # Length, Width, Height
         self.scene.add_box(self.box_name, self.box_pose, size=(0.6, 0.8, 0.1))
         # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+
+    def go_to_joint_state(self):
+        # Planning to a Joint Goal
+        joint_goal = self.move_group.get_current_joint_values()
+        print(joint_goal)
+        joint_goal[0] = 0.09395632325798159
+        joint_goal[1] = 0.4088058799714628
+        joint_goal[2] = 1.313087554429914
+        joint_goal[3] = 1.9941750242510379
+        joint_goal[4] = 1.0657331523833913
+        joint_goal[5] = -1.5274613695369008
+        joint_goal[6] = 1.3652429012180183
+
+    # 0.09395632325798159, 0.4088058799714628, 1.313087554429914, 1.9941750242510379, 1.0657331523833913, -1.5274613695369008, 1.3652429012180183
+        # The go command can be called with joint values, poses, or without any
+        # parameters if you have already set the pose or joint target for the group
+        self.move_group.go(joint_goal, wait=True)
+
+        # Calling ``stop()`` ensures that there is no residual movement
+        self.move_group.stop()
 
     def go_to_pose_goal(self, goal=[0.5, 0.0]):
         """ This function is called to bring the EE to its
@@ -372,7 +391,7 @@ class PickPlace():
             waypoints.append(p)
         # Now plan and move
         path_type = self.plan_cartesian_path(waypoints, goal)
-        rospy.sleep(0.5)
+        rospy.sleep(1)
 
         return path_type
 
