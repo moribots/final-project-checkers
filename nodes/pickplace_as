@@ -20,6 +20,7 @@ import moveit_msgs.msg
 import baxter_interface
 from baxter_interface import Gripper, CHECK_VERSION
 import tf.transformations as tr
+from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
 from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
 
 
@@ -90,7 +91,7 @@ class PickPlace():
         # z is the z position of the objects we want to grasp
         # set to the table z origin plus half the table height
         # self.z_org is the z origin
-        self.z_org = -0.331
+        self.z_org = -0.31
         self.z = self.z_org + 0.05
 
         # Add table as collision object
@@ -156,7 +157,7 @@ class PickPlace():
         pose_goal.orientation.w = 0
         pose_goal.position.x = goal[0]
         pose_goal.position.y = goal[1]
-        pose_goal.position.z = 0.0
+        pose_goal.position.z = 0
 
         # Set the pose target
         move_group.set_pose_target(pose_goal)
@@ -211,6 +212,7 @@ class PickPlace():
         # Publish feedback
         feedback.completed_moves.append("pick_approach")
         self.asrv.publish_feedback(feedback)
+        rospy.sleep(0.5)
 
         # GRASP GOAL
         rospy.loginfo("================== Grasp ==============")
@@ -225,6 +227,7 @@ class PickPlace():
         # Publish feedback
         feedback.completed_moves.append("pick")
         self.asrv.publish_feedback(feedback)
+        rospy.sleep(0.5)
 
         # RETREAT GOAL (same as approach)
         rospy.loginfo("================== Retreat ==============")
@@ -235,6 +238,7 @@ class PickPlace():
         # Publish feedback
         feedback.completed_moves.append("pick_retreat")
         self.asrv.publish_feedback(feedback)
+        rospy.sleep(0.5)
 
         # Return result for Action result
         result = ""
@@ -285,6 +289,7 @@ class PickPlace():
         # Publish feedback
         feedback.completed_moves.append("place_approach")
         self.asrv.publish_feedback(feedback)
+        rospy.sleep(0.5)
 
         # RELEASE GOAL
         rospy.loginfo("================== Release ==============")
@@ -299,6 +304,7 @@ class PickPlace():
         # Publish feedback
         feedback.completed_moves.append("place")
         self.asrv.publish_feedback(feedback)
+        rospy.sleep(0.5)
 
         # RETREAT GOAL (same as approach)
         rospy.loginfo("================== Retreat ==============")
@@ -309,6 +315,18 @@ class PickPlace():
         # Publish feedback
         feedback.completed_moves.append("place_retreat")
         self.asrv.publish_feedback(feedback)
+        rospy.sleep(0.5)
+
+        # GO TO HOME
+        rospy.loginfo("================== Home ==============")
+        # Pass the goal and the release z coordinate
+        path_type = self.create_path([0.5, -0.1], self.z + self.standoff)
+        if path_type == "pose":
+            comp_count += 1
+        # Publish feedback
+        feedback.completed_moves.append("home")
+        self.asrv.publish_feedback(feedback)
+        rospy.sleep(0.5)
 
         # Return result for Action result
         result = ""
