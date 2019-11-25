@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-""" 
+"""
 REFERENCE: https://github.com/ros-planning/moveit_tutorials/blob/master/doc/move_group_python_interface/scripts/move_group_python_interface_tutorial.py
 
 DESCRIPTION: The Pick Place Action Server
@@ -17,8 +17,6 @@ import copy
 import numpy as np
 import moveit_commander
 import moveit_msgs.msg
-from moveit_msgs.msg import Grasp, PlaceLocation  # For pickplace
-from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
 import baxter_interface
 from baxter_interface import Gripper, CHECK_VERSION
 import tf.transformations as tr
@@ -26,7 +24,6 @@ from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
 
 
 class PickPlace():
-
     def __init__(self):
         # Initialise
         rospy.loginfo("Initializing Baxter with MoveIt!")
@@ -99,9 +96,16 @@ class PickPlace():
         # Add table as collision object
         self.add_box()
 
+        # Go to home position
+        self.go_to_pose_goal()
+
         # Initialise action server
-        rospy.loginfo("Initialising action server!")
-        self.asrv = actionlib.SimpleActionServer("pick_place_as", PickPlaceAction, execute_cb=self.execute_cb, auto_start=False)
+        rospy.loginfo("Initialising action server...")
+        self.asrv = actionlib.SimpleActionServer("pick_place_as",
+                                                 PickPlaceAction,
+                                                 execute_cb=self.execute_cb,
+                                                 auto_start=False)
+        rospy.loginfo("Action server initialised!")
         # Start action server
         self.asrv.start()
 
@@ -192,9 +196,9 @@ class PickPlace():
             Args: goal (list of two elements, x and y goal position)
 
             Returns: Performs approach, grasp, and retreat actions and pubs
-            		 completed_moves feedback in realtime
-            		 also returns status: "succeeded" or "compromised" for
-            		 result return
+                     completed_moves feedback in realtime
+                     also returns result: "succeeded" or "compromised" for
+                     result return
         """
         # path_type counter, if more than one is "pose", return compromised
         comp_count = 0
@@ -203,7 +207,7 @@ class PickPlace():
         # Pass the goal and the approach z coordinate
         path_type = self.create_path(goal, self.z + self.standoff)
         if path_type == "pose":
-        	comp_count += 1
+            comp_count += 1
         # Publish feedback
         feedback.completed_moves.append("pick_approach")
         self.asrv.publish_feedback(feedback)
@@ -213,7 +217,7 @@ class PickPlace():
         # Pass the goal and the grasp z coordinate
         path_type = self.create_path(goal, self.z)
         if path_type == "pose":
-        	comp_count += 1
+            comp_count += 1
 
         # Close Gripper to grasp
         self.right_gripper.close()
@@ -227,18 +231,18 @@ class PickPlace():
         # Pass the goal and the retreat z coordinate
         path_type = self.create_path(goal, self.z + self.standoff)
         if path_type == "pose":
-        	comp_count += 1
+            comp_count += 1
         # Publish feedback
         feedback.completed_moves.append("pick_retreat")
         self.asrv.publish_feedback(feedback)
 
-        # Return status for Action result
-        status = ""
+        # Return result for Action result
+        result = ""
         if comp_count == 0:
-        	status = "succeeded"
+            result = "succeeded"
         else:
-        	status = "compromised"
-        return status
+            result = "compromised"
+        return result
 
     def place_cartesian(self, goal, feedback):
         """ Receives a place goal and performs 4 actions:
@@ -266,9 +270,9 @@ class PickPlace():
             Args: goal (list of two elements, x and y goal position)
 
             Returns: Performs approach, grasp, and retreat actions and pubs
-            		 completed_moves feedback in realtime
-            		 also returns status: "succeeded" or "compromised" for
-            		 result return
+                     completed_moves feedback in realtime
+                     also returns result: "succeeded" or "compromised" for
+                     result return
         """
         # path_type counter, if more than one is "pose", return compromised
         comp_count = 0
@@ -277,7 +281,7 @@ class PickPlace():
         # Pass the goal and the approach z coordinate
         path_type = self.create_path(goal, self.z + self.standoff)
         if path_type == "pose":
-        	comp_count += 1
+            comp_count += 1
         # Publish feedback
         feedback.completed_moves.append("place_approach")
         self.asrv.publish_feedback(feedback)
@@ -287,7 +291,7 @@ class PickPlace():
         # Pass the goal and the release z coordinate
         path_type = self.create_path(goal, self.z)
         if path_type == "pose":
-        	comp_count += 1
+            comp_count += 1
 
         # Close Gripper to grasp
         self.right_gripper.open()
@@ -301,18 +305,18 @@ class PickPlace():
         # Pass the goal and the release z coordinate
         path_type = self.create_path(goal, self.z + self.standoff)
         if path_type == "pose":
-        	comp_count += 1
+            comp_count += 1
         # Publish feedback
         feedback.completed_moves.append("place_retreat")
         self.asrv.publish_feedback(feedback)
 
-        # Return status for Action result
-        status = ""
-        if comp_count== 0:
-        	status = "succeeded"
+        # Return result for Action result
+        result = ""
+        if comp_count == 0:
+            result = "succeeded"
         else:
-        	status = "compromised"
-        return status
+            result = "compromised"
+        return result
 
     def create_path(self, goal, z, iter=20):
         """ Creates list of waypoint poses that make up cartesian
@@ -389,7 +393,8 @@ class PickPlace():
         # translation.  Disable jump thresh by setting it to 0.0
         # waypoints to follow, eef_step, jump_threshold
         while fraction <= 0.8 and attempts < max_attempts:
-            plan, fraction = self.move_group.compute_cartesian_path(waypoints, 0.01, 0.0)
+            plan, fraction = self.move_group.compute_cartesian_path(
+                waypoints, 0.01, 0.0)
             # Increment the number of attempts
             attempts += 1
         # If we have a complete plan, execute the trajectory
@@ -407,30 +412,30 @@ class PickPlace():
         return path_type
 
     def execute_cb(self, goal):
-    	""" DESCRIPTION:
+        """ DESCRIPTION:
 
-    		Args:
+            Args:
 
-    		Returns
-    	"""
-    	# Feedback and Result for Action
-    	print("Goal Received")
-    	feedback = PickPlaceFeedback()
+            Returns
+        """
+        # Feedback and Result for Action
+        print("Goal Received")
+        feedback = PickPlaceFeedback()
         result = PickPlaceResult()
 
-    	# Execute Pick Routine
-    	pick_status = self.pick_cartesian(goal.pick_goal, feedback)
+        # Execute Pick Routine
+        pick_result = self.pick_cartesian(goal.pick_goal, feedback)
 
-    	# Execute Place Routine
-    	place_status = self.place_cartesian(goal.place_goal, feedback)
+        # Execute Place Routine
+        place_result = self.place_cartesian(goal.place_goal, feedback)
 
-    	# Return result
-    	if pick_status == "compromised" or place_status == "compromised":
-    		result.status = "compromised"
-    	else:
-    		result.status = "succeeded"
-    	# Return result
-    	self.asrv.set_succeeded(result)
+        # Return result
+        if pick_result == "compromised" or place_result == "compromised":
+            result.status = "compromised"
+        else:
+            result.status = "uncompromised"
+        # Return result
+        self.asrv.set_succeeded(result)
 
 
 if __name__ == "__main__":
