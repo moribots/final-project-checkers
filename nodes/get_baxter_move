@@ -6,7 +6,8 @@ import numpy as np
 
 if __name__ == '__main__':
     rospy.init_node('get_baxter_move')
-    print('RULES: Grid squares start counting from Baxter\'s left corner (Ex. 3,3 = third column and third row from Baxter\'s left corner)\nDark player gos first. Double jumps are not allowed (yet).')
+    print('RULES: Grid squares start counting from Baxter\'s left corner (Ex. 3,3 = third column and third row from Baxter\'s left corner)\nDark player gos first. \
+    If you double jump, put only the start position and the goal position after the double jump. \n')
     ai = CheckersAI()
     #   this side is for player whos turn it its
     state = [[-1, 0,-1, 0,-1, 0,-1, 0],
@@ -14,9 +15,15 @@ if __name__ == '__main__':
              [-1, 0,-1, 0,-1, 0,-1, 0],
              [ 0, 0, 0, 0, 0, 0, 0, 0],
              [ 0, 0, 0, 0, 0, 0, 0, 0],
-             [ 0, 1, 0, 1, 0, 1, 0, 1],
-             [ 1, 0, 1, 0, 1, 0, 1, 0],
-             [ 0, 1, 0, 1, 0, 1, 0, 1]]
+             [ 0, 1, 0, 0, 0, 1, 0, 1],
+             [ 0, 0, 1, 0, 1, 0, 1, 0],
+             [ 0, -2, 0, 1, 0, 1, 0, 1]]
     board = Board(state)
     player = raw_input('Enter Baxter\'s color(Black or Red):') #in future batxer will know based on how the board is set up
-    s = ai.give_command(board,player)
+    s,g,c = ai.give_command(board,player)
+    #print(s,g,c)
+    print('Start: [%i,%i], Goal: [%i,%i]'%(s[0]+1,s[1]+1,g[0]+1,g[1]+1))
+    for i in range(len(c)):
+        for j in range(len(c[i])):
+            c[i][j] += 1
+    print('Captured: '+str(c))
