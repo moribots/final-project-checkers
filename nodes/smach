@@ -1,0 +1,209 @@
+#!/usr/bin/env python
+"""
+REFERENCE: https://github.com/ros-planning/moveit_tutorials/blob/master/doc/move_group_python_interface/scripts/move_group_python_interface_tutorial.py
+
+DESCRIPTION: The Pick Place Action Server
+
+
+SUBSCRIBERS:
+
+SERVICES:
+"""
+
+import rospy
+import smach
+import smach_ros
+import actionlib
+from checkers.msg import PickPlaceAction, PickPlaceGoal
+import baxter_interface
+
+
+class Client():
+    def __init__(self):
+        # Enable Baxter
+        baxter_interface.robot_enable.RobotEnable()
+        rospy.loginfo("Baxter Enabled!")
+        # Initialise pick place client
+        self.pp_client = actionlib.SimpleActionClient('pick_place_as',
+                                                      PickPlaceAction)
+        # Wait for server response
+        self.pp_client.wait_for_server()
+        # Initialise goal msg
+        self.goal = PickPlaceGoal()
+
+
+class SETUP(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['initialised'])
+
+    def execute(self, userdata):
+        rospy.loginfo('Initialising...')
+        # Call Camera Calibration AS
+
+        # Call EE-Board Transform AS
+
+        # Display on screen: please set up the board and
+        # hit enter when ready
+        rospy.loginfo('Please set up the board and hit enter when ready')
+        raw_input()
+
+        return 'initialised'
+
+
+class PICKCOLOR(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['red', 'black'])
+
+    def execute(self, userdata):
+        rospy.loginfo('Determining who goes first...')
+        # Call AS to determine if baxter is red or black
+        if True is True:
+            return 'black'
+        else:
+            return 'red'
+
+
+class WAIT(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['play'])
+
+    def execute(self, userdata):
+        rospy.loginfo('Press Enter to end your turn')
+        raw_input()
+
+        return 'play'
+
+
+class MYTURN(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['move', 'exit'])
+
+    def execute(self, userdata):
+        rospy.loginfo('Reading board state')
+        # Call AS to read board state and feed data to logic
+        rospy.loginfo("Let's see how well you played...")
+
+        # Call logic function to determine win/lose
+        end_game = False
+        status = "win"
+        if end_game is True:
+            if status == "win":
+                rospy.loginfo("Ha! I win!")
+            elif status == "draw":
+                rospy.loginfo("Everyone is a winner!")
+            elif status == "lose":
+                rospy.loginfo("You win :(")
+            return 'exit'
+        else:
+            return 'move'
+
+
+class MOVE(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['wait', 'exit'])
+
+    def execute(self, userdata):
+        # Call Logic fcn to determine next move
+
+        # Call AS to perform pick-place
+
+        # Call logic function to determine win/lose
+        end_game = False
+        status = "win"
+        if end_game is True:
+            if status == "win":
+                rospy.loginfo("Ha! I win!")
+            elif status == "draw":
+                rospy.loginfo("Everyone is a winner!")
+            elif status == "lose":
+                rospy.loginfo("You win :(")
+            return 'exit'
+        else:
+            return 'wait'
+
+
+class SHUTDOWN(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['end'])
+
+    def execute(self, userdata):
+        rospy.loginfo('Disabling Baxter...')
+        # Disable Baxter
+
+        return 'end'
+
+
+def main():
+    """ The Main Function
+
+        Call Client to initialise action servers
+
+        State Machine Hierarchy:
+        (AS means Action Server, outcomes are in square brackets)
+
+        STATE_MACHINE
+
+        - Setup (AS: Calibrate Camera - run until successful calibration
+          --> AS: Calibrate EE-Board transform -->
+          DISPLAY: Ask human to put pieces on board (raw_input) [initialised])
+
+        - AS: Baxter_Red_or_Black (two outcomes)
+            -- Black: [wait] --> Wait raw_input()
+            -- Red: [play] --> MyTurn
+        - Wait raw_input() [play] --> MyTurn
+        - MyTurn (AS: Read Board [check] --> Logic_win_lose_draw (two outcomes)
+            -- [wld] Win/Lose/Draw [exit] --> ShutDown [end]
+            -- [move] Next_Move [pickplace] --> AS: PickPlace [check]
+                --> Logic_win_lose_draw (two outcomes)
+                    -- [wld] Win/Lose/Draw [exit] --> ShutDown ([end]
+                    -- [wait] Wait raw_input()) --> MyTurn [play]
+
+    """
+    # Initialise node
+    rospy.init_node('smach')
+    # Initialise Action Servers
+    client = Client()
+
+    # Create the top level SMACH state machine
+    sm_top = smach.StateMachine(outcomes=['end'])
+
+    # Open the container
+    with sm_top:
+        # Setup State
+        smach.StateMachine.add('SETUP',
+                               SETUP(),
+                               transitions={'initialised': 'PICKCOLOR'})
+        # Pick Color State
+        smach.StateMachine.add('PICKCOLOR',
+                               PICKCOLOR(),
+                               transitions={
+                                   'red': 'MYTURN',
+                                   'black': 'WAIT'
+                               })
+        # Wait State
+        smach.StateMachine.add('WAIT', WAIT(), transitions={'play': 'MYTURN'})
+        # My Turn State
+        smach.StateMachine.add('MYTURN',
+                               MYTURN(),
+                               transitions={
+                                   'move': 'MOVE',
+                                   'exit': 'SHUTDOWN'
+                               })
+        # Move State
+        smach.StateMachine.add('MOVE',
+                               MOVE(),
+                               transitions={
+                                   'wait': 'WAIT',
+                                   'exit': 'SHUTDOWN'
+                               })
+        # Shutdown State
+        smach.StateMachine.add('SHUTDOWN',
+                               SHUTDOWN(),
+                               transitions={'end': 'end'})
+
+    # Execute SMACH plan
+    outcome = sm_top.execute()
+
+
+if __name__ == '__main__':
+    main()

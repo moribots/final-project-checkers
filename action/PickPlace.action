@@ -1,0 +1,15 @@
+# Goal
+# A two-element 2D list containing the pick and place (x, y) coordinates respectively
+# e.g [[0.0, 0.0], [1.0, 1.0]]
+float32[] pick_goal
+float32[] place_goal
+
+---
+# Result
+# Whether the action has succeeded or compromised
+string status
+
+---
+# Feedback
+# The current move being executed (pick_approach, pick, pick_retreat, place_approach, place, place_retreat)
+string[] completed_moves
