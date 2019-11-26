@@ -27,7 +27,10 @@ from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
 class PickPlace():
     def __init__(self):
         # Initialise
-        rospy.loginfo("Initializing Baxter with MoveIt!")
+        rospy.loginfo("Initializing Baxter with MoveIt...")
+        # Enable baxter
+        baxter_interface.robot_enable.RobotEnable()
+        rospy.loginfo("Baxter Enabled!")
         # Initialize moveit_commander with kin model
         # and current joint states
         # This remap is important because otherwise it is impossible
@@ -45,12 +48,6 @@ class PickPlace():
         self.scene = moveit_commander.PlanningSceneInterface()
         # Interface used to execute motions
         self.move_group = moveit_commander.MoveGroupCommander("right_arm")
-
-        # Display Trajectory in RVIZ
-        self.display_trajectory_publisher = rospy.Publisher(
-            '/move_group/display_planned_path',
-            moveit_msgs.msg.DisplayTrajectory,
-            queue_size=20)
 
         # Getting Basic Information
         # Get robot reference frame name
@@ -136,7 +133,7 @@ class PickPlace():
         joint_goal = self.move_group.get_current_joint_values()
         # Overwrite current pose with desired pose
         # Default pose is out of board's way
-        print(joint_goal)
+        # print(joint_goal)
         joint_goal[0] = j0
         joint_goal[1] = j1
         joint_goal[2] = j2

@@ -1,0 +1,114 @@
+#!/usr/bin/env python
+"""
+REFERENCE: https://github.com/ros-planning/moveit_tutorials/blob/master/doc/move_group_python_interface/scripts/move_group_python_interface_tutorial.py
+
+DESCRIPTION: The Pick Place Action Server
+
+
+SUBSCRIBERS:
+
+SERVICES:
+"""
+
+import rospy
+import smach
+import smach_ros
+import actionlib
+from checkers.msg import PickPlaceAction, PickPlaceGoal
+
+
+class Client():
+    def __init__(self):
+        # Initialise pick place client
+        self.pp_client = actionlib.SimpleActionClient('pick_place_as', PickPlaceAction)
+        # Wait for server response
+        self.pp_client.wait_for_server()
+        # Initialise goal msg
+        self.goal = PickPlaceGoal
+
+
+# define state Bas
+class Setup(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['outcome3'])
+
+    def execute(self, userdata):
+        rospy.loginfo('Executing state BAS')
+        return 'outcome3'
+
+
+# define state Foo
+class Foo(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['outcome1','outcome2'])
+        self.counter = 0
+
+    def execute(self, userdata):
+        rospy.loginfo('Executing state FOO')
+        if self.counter < 3:
+            self.counter += 1
+            return 'outcome1'
+        else:
+            return 'outcome2'
+
+
+# define state Bar
+class Bar(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['outcome1'])
+
+    def execute(self, userdata):
+        rospy.loginfo('Executing state BAR')
+        return 'outcome1'
+
+
+
+
+def main():
+    """ The Main Function
+
+        Call Client to initialise action servers
+
+        State Machine Hierarchy:
+
+        STATE_MACHINE
+
+        Setup ()
+    """
+    # Initialise node
+    rospy.init_node('checkers_smach')
+    # Initialise Action Servers
+    client = Client()
+
+    # Create the top level SMACH state machine
+    sm_top = smach.StateMachine(outcomes=['end'])
+
+    # Open the container
+    with sm_top:
+
+        smach.StateMachine.add('BAS', Bas(),
+                               transitions={'outcome3':'SUB'})
+
+        # Create the sub SMACH state machine
+        sm_sub = smach.StateMachine(outcomes=['play'])
+
+        # Open the container
+        with sm_sub:
+
+            # Add states to the container
+            smach.StateMachine.add('FOO', Foo(), 
+                                   transitions={'outcome1':'BAR', 
+                                                'outcome2':'outcome4'})
+            smach.StateMachine.add('BAR', Bar(), 
+                                   transitions={'outcome1':'FOO'})
+
+        smach.StateMachine.add('SUB', sm_sub,
+                               transitions={'outcome4':'outcome5'})
+
+    # Execute SMACH plan
+    outcome = sm_top.execute()
+
+
+
+if __name__ == '__main__':
+    main()
