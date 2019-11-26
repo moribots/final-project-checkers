@@ -90,11 +90,8 @@ class Board():
     def __init__(self,state):
         self.red_piece_count = 12
         self.black_piece_count = 12
-        self.r_steps = [[-1,1],[1,1]] #bottom up left to right
-        self.b_steps = [[-1,-1],[1,-1]] #top down left to right
-        self.king_steps = [[-1,-1],[1,-1],[[-1,1],[1,1]]]
         self.state = state
-        #self.type = [('r',self.r_steps),('c',self.b_steps),('R',self.king_steps),('B',,self.king_steps)]
+
 
     def world_to_grid(self):
         '''Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position.'''
@@ -102,57 +99,76 @@ class Board():
 
     def get_moves(self,player):
 
-        def can_jump(row,col,stepc):#,stepc):
+        def can_jump(row,col,step_r,step_c):
+            '''ARGS:
+                row: current row
+                col: current column
+                step_r: directions to step row-wise
+                step_c: directions to step column-wise
+               Returns:
+                move: (start, goal) pair (if any) of legal moves
+                captured: (start,captured piece position) pair of any captured pieces
+                cap: (bool) whether any pieces were captured or not
+            Checks if step in given direction keeps piece in bound, if it does, checks if there is a place to jump, and the jumped piece is the other player's
+                '''
             captured = []
             move = []
             cap = False
-            if col > 5 and stepc > 0: #make sure pawn doesn't try to jump off board
-                stepc = -1
-            if self.state[row+(2*self.step_r)][col+(2*stepc)] == 0 and self.state[row+self.step_r][col+stepc] == self.not_p:
-                #capture condition met
-                move = [[row,col],[row+(2*self.step_r),col+(2*stepc)]]
-                captured = [[row,col],[row+(self.step_r),col+(stepc)]]
-                cap = True
-                if self.p == -1:
-                    self.black_piece_count -= 1
-                else:
-                    self.red_piece_count -= 1
+            if col+(2*step_c) >= 0 and col+(2*step_c) <= 7 and row+(2*step_r) >= 0 and row+(2*step_r) <= 7:
+                if self.state[row+(2*step_r)][col+(2*step_c)] == 0 and \
+                self.state[row+step_r][col+step_c] == self.not_p or self.state[row+step_r][col+step_c] == self.not_p*2:  #check if space after jump is empty and if it is the opponents piece
+                    #capture condition met, save position of jump and captured piece
+                    move = [[row,col],[row+(2*step_r),col+(2*step_c)]]
+                    captured = [[row,col],[row+step_r,col+step_c]]
+                    cap = True
+                    if self.p == -1: #reduce pices count
+                        self.black_piece_count -= 1
+                    else:
+                        self.red_piece_count -= 1
             return move,captured,cap
 
-        def can_step(r,c,step):
-        ''' Args:
-                r: current row index
-                c: current column index
-                step: either 1,-1, or both, states which direction side to side the piece can move diagonally
-            Returns:
-                moves: list of (start, goal) pairs (if any) of legal moves
-                capture: list of (start,captured piece position) pairs of any captured pieces'''
+        def can_step(r,c):
+            ''' Args:
+                 r: current row index
+                 c: current column index
+                 step: either 1,-1, or both, states which direction side to side the piece can move diagonally
+                Returns:
+                 moves: list of (start, goal) pairs (if any) of legal moves
+                 capture: list of (start,captured piece position) pairs of any captured pieces
+                Checks if a step is possible is each possible direction for a type of piece. if step is not possible, checks for jump.
+                if jump was successful, checks for possible double jumps.'''
             moves = []
             capture = []
-
-            for s in step: #try to take a step in valid directions
-                stepc = self.step_r*s
-                #print(stepc)
-                if self.state[r][c] == self.p and c <= 6:# checks that its players piece
+            step = []
+            #set possible steps based on whether a pawn or king
+            if self.state[r][c] == self.p:
+                step = [[1,1],[1,-1]]
+            if self.state[r][c] == self.p*2:
+                step = [[1,1],[1,-1],[-1,1],[-1,-1]]
+                #print('King')
+            for s in step: #take a step in valid directions
+                stepc = s[1]
+                stepr = s[0]
+                if c+stepc >= 0 and c+stepc <= 7 and r+stepr >= 0 and r+stepr <= 7: # Checks that the step won't take piece out of bounds
                     '''Single Step'''
-
-                    if self.state[r+self.step_r][c+stepc] == 0: #if the diagonal square is empty, add to list of legal moves
-                        moves.append([[r,c],[r+self.step_r,c+stepc]])
-                    elif r <= 6 : #if enough space to make a jump
-                        #make a jump if it is the opponents piece
-                        move, cap, cap_success = can_jump(r,c,stepc) #single jump
+                    if self.state[r+stepr][c+stepc] == 0: #if the diagonal square is empty, add step to list of legal moves
+                        moves.append([[r,c],[r+stepr,c+stepc]])
+                    else: #If not empty, try to make a jump
+                        move, cap, cap_success = can_jump(r,c,stepr,stepc) #single jump
                         moves = [move]
                         if len(cap) != 0:
-                            capture = [cap]
+                            capture = [cap] #store captured piece position if successful jump
                         '''Double jump'''
-                        if cap_success and r < 3:#check for double jump
-                            for s2 in step:
-                                stepc2 = self.step_r*s2
+                        if cap_success: #check for double jump
+                            for s2 in step: #check all possible step directions
+                                stepc2 = s2[1]
+                                stepr2 = s2[0]
                                 parent = move[0] #save start position from first jump
-                                temp, dcap,cap_success = can_jump(move[1][0],move[1][1],stepc2) #double jump
+                                temp, dcap,cap_success = can_jump(move[1][0],move[1][1],stepr2,stepc2) #double jump
                                 if cap_success:
-                                    moves.append([parent,temp[1]]) #return parent from first jump and goal from second jump
+                                    moves[0][1] = temp[1] #replace previously saved end position with end position after double jump
                                     capture.append([parent,dcap[1]])
+
             return moves, capture
 
         def flip_board(state):
@@ -172,7 +188,7 @@ class Board():
         capture = []
         steps = [[1,-1],[1,1]]
         self.step_r = 1
-        if player == 'Black': #state is always read in starting with dark color first
+        if player == 'Black': #state is always read in starting with dark color first since black player goes first
             #Black is -1
             self.p = -1
             self.not_p = 1
@@ -183,41 +199,12 @@ class Board():
         #cycle through grid cells
         for r in range(8):
             for c in range(8):
-                if r == 7:#only kings can move
-                    if self.state[r][c] == self.p*2 and self.p*2 != self.not_p*2:
-                        for step in self.king_steps:
-                            try:
-                                print([[self.state[r][c]],[self.state[r+step[0][0]][c+step[0][1]]]])
-                                temp.append([[self.state[r][c]],[self.state[r+step[0][0]][c+step[0][1]]]])
-                                moves.append([[r,c],[r+step[0][0],c+step[0][1]]])
-                                print('Move King')
-                            except IndexError:
-                                print('out of bounds')
-                else:
-                    if c == 0: #can only move toward center of board
-                        m,cap = can_step(r,c,[1])
-                        for i in range(len(m)):
-                            if len(m[i]) != 0:
-                                moves.append(m[i])
-                        for i in range(len(cap)):
-                            if len(cap[i]) != 0:
-                                capture.append(cap[i])
+                mK,capK = can_step(r,c)
+                for i in range(len(mK)):
+                    if len(mK[i]) != 0:
+                        moves.append(mK[i])
+                for i in range(len(capK)):
+                    if len(capK[i]) != 0:
+                        capture.append(capK[i])
 
-                    elif c == 7: #can only move toward center of board
-                        m,cap = can_step(r,c,[-1])
-                        for i in range(len(m)):
-                            if len(m[i]) != 0:
-                                moves.append(m[i])
-                        for i in range(len(cap)):
-                            if len(cap[i]) != 0:
-                                capture.append(cap[i])
-                    else: #can move diagonally in either direction side to side
-                        m,cap = can_step(r,c,[1,-1])
-                        for i in range(len(m)):
-                            if len(m[i]) != 0:
-                                moves.append(m[i])
-                        for i in range(len(cap)):
-                            if len(cap[i]) != 0:
-                                capture.append(cap[i])
-        #print(moves)
         return moves, capture
