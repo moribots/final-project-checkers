@@ -8,7 +8,7 @@
     <!-- <node name="moveit_motion_plan" pkg="checkers" type="moveit_motion_plan" output="screen" /> -->
 
   <!-- State Machine -->
-  <node name="smach" pkg="checkers" type="smach" output="screen" />
+  <!-- <node name="smach" pkg="checkers" type="smach" output="screen" /> -->
     
 
 </launch>

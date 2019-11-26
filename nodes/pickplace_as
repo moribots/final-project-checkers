@@ -48,6 +48,9 @@ class PickPlace():
         self.scene = moveit_commander.PlanningSceneInterface()
         # Interface used to execute motions
         self.move_group = moveit_commander.MoveGroupCommander("right_arm")
+        # Set position and orientation tolerance
+        # self.move_group.set_goal_position_tolerance = 0.05
+        # self.move_group.set_goal_orientation_tolerance = 0.3
 
         # Getting Basic Information
         # Get robot reference frame name
@@ -128,6 +131,12 @@ class PickPlace():
         # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
 
     def go_to_joint_state(self, j0=-0.76, j1=0.19, j2=1.23, j3=1.95, j4=1.244, j5=-1.33, j6=0.56):
+        """ DESCRIPTION:
+
+            Args:
+
+            Returns:
+        """
         # Planning to a Joint Goal
         # Get current pose to set type
         joint_goal = self.move_group.get_current_joint_values()
@@ -400,6 +409,9 @@ class PickPlace():
             # Point Down for the final waypoint
             if i >= iter - 1:
                 p.orientation.x = 1
+                p.orientation.y = 0
+                p.orientation.z = 0
+                p.orientation.w = 0
             waypoints.append(p)
         # Now plan and move
         path_type = self.plan_cartesian_path(waypoints, goal)
