@@ -144,6 +144,8 @@ class MOVE(smach.State):
         # FOR EACH BAXTER MOVE
         self.client.pp_goal.pick_goal = [0.5, 0.0]
         self.client.pp_goal.place_goal = [0.6, 0.0]
+        # Set home to false to make sure pick place executes
+        self.client.pp_goal.home = False
         self.client.pp_client.send_goal(
             self.client.pp_goal, feedback_cb=self.client.feedback_pp)
         self.client.pp_client.wait_for_result()
@@ -159,6 +161,13 @@ class MOVE(smach.State):
         self.client.pp_client.wait_for_result()
         cart = self.client.pp_client.get_result()
         rospy.loginfo("Cartesian path {}".format(cart))
+
+        # Call AS to go home to clear board for camera
+        self.client.pp_goal.home = True
+        self.client.pp_client.send_goal(self.client.pp_goal)
+        self.client.pp_client.wait_for_result()
+        cart = self.client.pp_client.get_result()
+        rospy.loginfo("Returned to Home Position")
 
         # Call logic function to determine win/lose
         end_game = False

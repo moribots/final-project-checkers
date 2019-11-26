@@ -48,9 +48,6 @@ class PickPlace():
         self.scene = moveit_commander.PlanningSceneInterface()
         # Interface used to execute motions
         self.move_group = moveit_commander.MoveGroupCommander("right_arm")
-        # Set position and orientation tolerance
-        # self.move_group.set_goal_position_tolerance = 0.05
-        # self.move_group.set_goal_orientation_tolerance = 0.3
 
         # Getting Basic Information
         # Get robot reference frame name
@@ -68,12 +65,12 @@ class PickPlace():
         rospy.loginfo("========== CURRENT STATE: %s" % self.robot_state)
 
         # Planning and Execurtion parameters
-        self.move_group.set_goal_position_tolerance(0.01)
+        self.move_group.set_goal_position_tolerance(0.001)
         self.move_group.set_goal_orientation_tolerance(0.01)
-        self.move_group.set_planning_time(5.0)
+        self.move_group.set_planning_time(10.0)
         self.move_group.allow_replanning(True)
-        self.move_group.set_max_velocity_scaling_factor(0.6)
-        self.move_group.set_max_acceleration_scaling_factor(0.6)
+        self.move_group.set_max_velocity_scaling_factor(0.5)
+        self.move_group.set_max_acceleration_scaling_factor(0.5)
 
         # State Gripper (L or R)
         self.right_gripper = Gripper('right', CHECK_VERSION)
@@ -360,13 +357,13 @@ class PickPlace():
         rospy.sleep(0.5)
 
         # GO TO HOME
-        rospy.loginfo("================== Home ==============")
-        # Return to away-from-board home config
-        self.go_to_joint_state()
-        # Publish feedback
-        feedback.completed_moves.append("home_finish")
-        self.asrv.publish_feedback(feedback)
-        rospy.sleep(0.5)
+        # rospy.loginfo("================== Home ==============")
+        # # Return to away-from-board home config
+        # self.go_to_joint_state()
+        # # Publish feedback
+        # feedback.completed_moves.append("home_finish")
+        # self.asrv.publish_feedback(feedback)
+        # rospy.sleep(0.5)
 
         # Return result for Action result
         result = ""
@@ -376,7 +373,7 @@ class PickPlace():
             result = "compromised"
         return result
 
-    def create_path(self, goal, z, iter=20):
+    def create_path(self, goal, z, iter=7):
         """ Creates list of waypoint poses that make up cartesian
             path.
 
@@ -484,17 +481,24 @@ class PickPlace():
         feedback = PickPlaceFeedback()
         result = PickPlaceResult()
 
-        # Execute Pick Routine
-        pick_result = self.pick_cartesian(goal.pick_goal, feedback)
-
-        # Execute Place Routine
-        place_result = self.place_cartesian(goal.place_goal, feedback)
-
-        # Return result
-        if pick_result == "compromised" or place_result == "compromised":
-            result.status = "compromised"
+        # Go home if required
+        if goal.home is True:
+            self.go_to_joint_state()
+            pick_result = ""
+            place_result = ""
         else:
-            result.status = "uncompromised"
+
+            # Execute Pick Routine
+            pick_result = self.pick_cartesian(goal.pick_goal, feedback)
+
+            # Execute Place Routine
+            place_result = self.place_cartesian(goal.place_goal, feedback)
+
+            # Return result
+            if pick_result == "compromised" or place_result == "compromised":
+                result.status = "compromised"
+            else:
+                result.status = "uncompromised"
         # Return result
         self.asrv.set_succeeded(result)
 
