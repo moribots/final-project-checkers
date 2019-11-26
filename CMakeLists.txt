@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
   message_generation
   rospy
+  smach
   std_msgs
 )
 
@@ -109,7 +110,7 @@ catkin_python_setup()
 catkin_package(
 #  INCLUDE_DIRS include
   LIBRARIES checkers
-  CATKIN_DEPENDS actionlib_msgs message_runtime moveit rospy
+  CATKIN_DEPENDS actionlib_msgs message_runtime moveit rospy smach
 #  DEPENDS system_lib
 )
 
@@ -167,6 +168,7 @@ include_directories(
 #   scripts/my_python_script
    nodes/moveit_motion_plan
    nodes/pickplace_as
+   nodes/smach
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
