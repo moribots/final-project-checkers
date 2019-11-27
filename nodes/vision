@@ -1,0 +1,130 @@
+#!/usr/bin/env python
+"""
+Node to output checker piece locations based on frames from camera.
+If can not see current board corners, will save previously known state.
+
+SUBSCRIBERS: (baxter/left_hand_camera)(something like that)
+
+PUBLISHERS: checker_locations_distance and checker_locations_game (A8 through H1)
+
+"""
+
+import numpy as np
+import cv2
+import glob
+import math
+
+# square width 43.5mm
+# termination criteria
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+
+# Values found from camera_calibration.py
+mtx = np.float32([[612.39488813,   0,         336.81987956],
+                  [  0,         614.62152505, 218.09689818],
+                  [  0,            0,           1         ]])
+dist = np.float32([[-0.17085467,  0.5427207,  -0.0095335,  -0.00170976, -0.65820667]])
+h = 480
+w = 640
+
+# Incase of
+##newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
+
+objp = np.zeros((7*7,3), np.float32)
+objp[:,:2] = np.mgrid[0:7,0:7].T.reshape(-1,2)
+
+axis = np.float32([[3,0,0], [0,3,0], [0,0,-3]]).reshape(-1,3)
+
+
+def rotate_matrix(mtx):
+    # Outputs a new 64x1 vector but rotated by 90 degrees clockwise as if it
+    # were an 8x8 matrix
+    mtx2 = []
+    for i in range(8):
+        line  = [mtx[i],mtx[i+8],mtx[i+16],mtx[i+24],mtx[i+32],mtx[i+40],mtx[i+48],mtx[i+56]]
+        line= line[::-1]
+        for j in line:
+            mtx2.append(j)
+    return(np.array(mtx2))
+
+# Made top left inside corner the origin based on cv2.findChessboardCorners().
+# All spaces are listed going left to right and top to bottom.  (A8 first, H1 last)
+board_pts = np.float32([[-0.5,-0.5,0],[.5,-0.5,0],[1.5,-0.5,0],[2.5,-0.5,0],[3.5,-0.5,0],[4.5,-0.5,0],[5.5,-0.5,0],[6.5,-0.5,0],
+                        [-0.5,0.5,0],[.5,0.5,0],[1.5,0.5,0],[2.5,0.5,0],[3.5,0.5,0],[4.5,0.5,0],[5.5,0.5,0],[6.5,0.5,0],
+                        [-0.5,1.5,0],[.5,1.5,0],[1.5,1.5,0],[2.5,1.5,0],[3.5,1.5,0],[4.5,1.5,0],[5.5,1.5,0],[6.5,1.5,0],
+                        [-0.5,2.5,0],[.5,2.5,0],[1.5,2.5,0],[2.5,2.5,0],[3.5,2.5,0],[4.5,2.5,0],[5.5,2.5,0],[6.5,2.5,0],
+                        [-0.5,3.5,0],[.5,3.5,0],[1.5,3.5,0],[2.5,3.5,0],[3.5,3.5,0],[4.5,3.5,0],[5.5,3.5,0],[6.5,3.5,0],
+                        [-0.5,4.5,0],[.5,4.5,0],[1.5,4.5,0],[2.5,4.5,0],[3.5,4.5,0],[4.5,4.5,0],[5.5,4.5,0],[6.5,4.5,0],
+                        [-0.5,5.5,0],[.5,5.5,0],[1.5,5.5,0],[2.5,5.5,0],[3.5,5.5,0],[4.5,5.5,0],[5.5,5.5,0],[6.5,5.5,0],
+                        [-0.5,6.5,0],[.5,6.5,0],[1.5,6.5,0],[2.5,6.5,0],[3.5,6.5,0],[4.5,6.5,0],[5.5,6.5,0],[6.5,6.5,0]]).reshape(-1,3)
+
+board_pts_1 = board_pts
+board_pts_2 = rotate_matrix(board_pts_1)
+board_pts_3 = rotate_matrix(board_pts_2)
+board_pts_4 = rotate_matrix(board_pts_3)
+
+prev_board_imgpts = []
+
+cap = cv2.VideoCapture(0)
+while cap.isOpened():
+
+    ret, frame = cap.read()
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Find the chess board corners
+    ret, corners = cv2.findChessboardCorners(gray, (7,7),None)
+
+    # If found, add object points, image points (after refining them)
+    if ret == True:
+        corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
+        corners3 = []
+        for i in corners2:
+                corners3.append(list(i.ravel()))
+
+        # Rotate order of square points to stay consistant with changing origin
+        if corners3[0][0] < corners3[-1][0] and corners3[0][1] < corners3[-1][1]:
+            board_pts = board_pts_1
+
+        if corners3[0][0] > corners3[-1][0] and corners3[0][1] < corners3[-1][1]:
+            board_pts = board_pts_2
+
+        if corners3[0][0] > corners3[-1][0] and corners3[0][1] > corners3[-1][1]:
+            board_pts = board_pts_3
+
+        if corners3[0][0] > corners3[-1][0] and corners3[0][1] > corners3[-1][1]:
+            board_pts = board_pts_4
+
+
+        # Find the rotation and translation vectors.
+        _, rvecs, tvecs, inliers = cv2.solvePnPRansac(objp, corners2, mtx, dist)
+
+        test_imgpts = np.float32([[250,250]]).reshape(-1,2)
+
+        #frame = draw(frame,corners2,imgpts)
+        board_imgpts, jac2 = cv2.projectPoints(board_pts,rvecs,tvecs,mtx,dist)
+
+        prev_board_imgpts = board_imgpts
+
+        # show square centers
+        for point in board_imgpts:
+            point = (point[0][0], point[0][1])
+            frame = cv2.circle(frame, point, 2, (255,0,0),2)
+
+        # List of available board squares
+
+        # Calculate distance to available board squares
+        for point in test_imgpts:
+            for point2 in board_imgpts:
+                point2 = point2[0]
+                distance = math.sqrt( ((point[0] - point2[0])**2) + ((point[1] - point2[1])**2))
+
+    else:
+        for point in prev_board_imgpts:
+            point = (point[0][0], point[0][1])
+            frame = cv2.circle(frame, point, 2, (0,0,255),2)
+
+    cv2.imshow('frame',frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+cap.release()
+cv2.destroyAllWindows()
