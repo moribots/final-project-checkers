@@ -134,6 +134,30 @@ class MOVE(smach.State):
         # Initialise client
         self.client = client
 
+    def pp_goal(self, pick_goal=[0, 0], place_goal=[0, 0], home=True):
+        """ DESCRIPTION
+
+            Args:
+
+            Returns:
+        """
+        if home is True:
+            self.client.pp_goal.home = home
+            self.client.pp_client.send_goal(self.client.pp_goal)
+            self.client.pp_client.wait_for_result()
+            rospy.loginfo("Returned to Home Position")
+
+        else:
+            self.client.pp_goal.pick_goal = pick_goal
+            self.client.pp_goal.place_goal = place_goal
+            # Set home to false to make sure pick place executes
+            self.client.pp_goal.home = home
+            self.client.pp_client.send_goal(
+                self.client.pp_goal, feedback_cb=self.client.feedback_pp)
+            self.client.pp_client.wait_for_result()
+            cart = self.client.pp_client.get_result()
+            rospy.loginfo("Cartesian path {}".format(cart))
+
     def execute(self, userdata):
         # Call Logic fcn to determine next move
         # userdata.client.move_client.send goal board_state
@@ -142,32 +166,21 @@ class MOVE(smach.State):
 
         # Call AS to perform pick-place per move
         # FOR EACH BAXTER MOVE
-        self.client.pp_goal.pick_goal = [0.5, 0.0]
-        self.client.pp_goal.place_goal = [0.6, 0.0]
-        # Set home to false to make sure pick place executes
-        self.client.pp_goal.home = False
-        self.client.pp_client.send_goal(
-            self.client.pp_goal, feedback_cb=self.client.feedback_pp)
-        self.client.pp_client.wait_for_result()
-        cart = self.client.pp_client.get_result()
-        rospy.loginfo("Cartesian path {}".format(cart))
+        pick_goal = [0.6, 0.0]
+        place_goal = [0.5, 0.0]
+        home = False
+        self.pp_goal(pick_goal, place_goal, home)
 
         # Call AS to perform pick-place per discard
         # FOR EACH BAXTER DISCARD
-        self.client.pp_goal.pick_goal = [0.6, 0.0]
-        self.client.pp_goal.place_goal = [0.5, 0.0]
-        self.client.pp_client.send_goal(
-            self.client.pp_goal, feedback_cb=self.client.feedback_pp)
-        self.client.pp_client.wait_for_result()
-        cart = self.client.pp_client.get_result()
-        rospy.loginfo("Cartesian path {}".format(cart))
+        pick_goal = [0.6, 0.0]
+        place_goal = [0.5, 0.0]
+        home = False
+        self.pp_goal(pick_goal, place_goal, home)
 
         # Call AS to go home to clear board for camera
-        self.client.pp_goal.home = True
-        self.client.pp_client.send_goal(self.client.pp_goal)
-        self.client.pp_client.wait_for_result()
-        cart = self.client.pp_client.get_result()
-        rospy.loginfo("Returned to Home Position")
+        # Defaults to go home
+        self.pp_goal()
 
         # Call logic function to determine win/lose
         end_game = False
@@ -271,8 +284,15 @@ def main():
                                SHUTDOWN(),
                                transitions={'end': 'end'})
 
+    # SMACH Viewer
+    # Create and start the introspection server
+    # sis = smach_ros.IntrospectionServer('checkers_smach', sm_top, '/CHECKERS')
+    # sis.start()
     # Execute SMACH plan
-    outcome = sm_top.execute()
+    sm_top.execute()
+
+    # rospy.spin()
+    # sis.stop()
 
 
 if __name__ == '__main__':
