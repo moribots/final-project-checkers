@@ -4,10 +4,11 @@ class CheckersAI():
     def __init__(self):
         self.game_over = False
         self.baxter_color = 'black'#None
+
         if self.baxter_color == 'black':
-            self.not_baxter == 'red'
+            self.not_baxter = 'red'
         elif self.baxter_color == 'red':
-            self.not_baxter == 'black'
+            self.not_baxter = 'black'
         self.whos_turn = 'black' #black goes first
         self.noCapture = 0
         self.winner = None
@@ -70,7 +71,7 @@ class CheckersAI():
         else:
             self.whos_turn = 'Red'
 
-    def is_game_over(self):
+    def is_game_over(self,state):
         if self.board.red_piece_count == 0:
             if self.baxter_color == 'black':
                 self.winner = 'baxter'
@@ -83,7 +84,7 @@ class CheckersAI():
             else:
                 self.winner = 'not_baxter'
             self.game_over = True
-        elif self.board.get_moves(self.whos_turn) == None:
+        elif self.board.get_moves(state,self.whos_turn) == None:
             self.switch_turn()
             if self.whos_turn == self.baxter_color:
                 self.winner = 'baxter'
@@ -97,16 +98,19 @@ class CheckersAI():
         #    if self.winner == 'Draw':
         #        print()
         #    print('The winner is '+str(self.winner))
-        return self.game_over
+        #return self.game_over
 
 
 
-    def make_move(move,cap):
+    def make_move(self,moves,cap):
         '''make a array of board states (nodes) after all legal moves starting from current state. include whether or not the node is terminal'''
         nodes = []
+        print('moves: '+str(moves))
+        print('captures: '+str(cap[0]))
+        cap = cap[0]
         for move in moves:
             w = 0
-            temp_state = self.state[:]
+            temp_state = self.board.state[:]
             temp_state[move[0][0]][move[0][1]] = 0
             temp_state[move[1][0]][move[1][1]] = self.board.p #should still be the last players value
             if cap != 0:
@@ -114,55 +118,78 @@ class CheckersAI():
                 self.noCapture = 0
             else:
                 self.noCapture += 1 #if it counts too high its a draw
-            win = self.is_game_over()
-            if win:
-                w = 1:
+            #print(temp_state)
+            self.is_game_over(temp_state)
+            if self.game_over:
+                w = 1
             nodes.append([move,temp_state,w])
 
         return nodes
 
 
-    def minimax(self,max):
+    def minimax(self,state_list):
         '''Minimax algorithm to get best moves for baxter
             ARGS: max: (bool) is maximizing player?'''
+        state = self.board.world_to_grid(state_list)
+        print(state)
+        self.path = []
+        bestvalue = self.prune(self.alpha,self.beta,state,True)
+        print(bestvalue)
+        best_move = []
 
 
 
 
 
-    def prune(self,alpha=float('-inf'),beta=float('+inf'),node,max):
+    def prune(self,alpha,beta,node,max): #based on pseudocode from https://www.hackerearth.com/blog/developers/minimax-algorithm-alpha-beta-pruning/
         '''Alpha beta pruning to optimize minimax'''
+        #self.board.world_to_grid(node)
+        print('black: '+str(self.board.black_piece_count))
+        print('red: '+str(self.board.red_piece_count))
+        self.is_game_over(node)
         if self.game_over: #return utility of the node if terminal node
             if self.winner == 'baxter': #returns count of baxter's pieces
                 if self.baxter_color == 'black':
-                    return self.board.black_piece_count
+                    val = self.board.black_piece_count
                 else:
-                    return self.board.red_piece_count
+                    val = self.board.red_piece_count
             elif self.winner == 'not_baxter': #return the count of not baxter's pieces
                 if self.not_baxter == 'black':
-                    return self.board.black_piece_count
+                    val = self.board.black_piece_count
                 else:
-                    return self.board.red_piece_count
+                    val = self.board.red_piece_count
             else:
-                return 0 #if draw score is zero
-            
-        #self.state = node[:] not needed since self.state is initialized in AS
+                val = 0 #if draw score is zero
+            self.path.append([node,val])
+            return val
+
         if max: #baxter is maximizing
-            move,cap = self.board.get_moves(node,self.baxter_color) #gets moves for current node
-            nodes = apply_moves(move,cap)
+            print('Max turn')
+            moves,cap = self.board.get_moves(node,self.baxter_color) #gets moves for current node
+            nodes = self.make_move(moves,cap)
+            print('Nodes:')
+            print(nodes[0][1])
+            print('\n')
             for child in nodes: #loop through children of current node
-                alpha = max(self.prune(alpha,beta,child,False),alpha)
-                if beta <= alpha:
-                    return alpha
-                return alpha
+                print('child: '+str(child))
+                val = max(self.prune(alpha,beta,child[1],False),val)
+                print('value: '+str(val))
+                print('beta: '+str(beta))
+                if beta <= val: #don't update alpha and prune if its greater than beta
+                    print('returning val')
+                    return val
+                alpha = max(alpha,val)
+                #self.path.append()
+            return val
         else: #minimizing player
-            move,cap = self.board.get_moves(node,self.not_baxter) #gets moves for current node
-            nodes = apply_moves(move,cap)
+            moves,cap = self.board.get_moves(node,self.not_baxter) #gets moves for current node
+            nodes = self.make_move(moves,cap)
             for child in nodes:
-                beta = min(prune(alpha,beta,child,True),beta)
-                if beta <= alpha:
-                    return beta
-                return beta
+                val = min(prune(alpha,beta,child,True),beta)
+                if val <= alpha:
+                    return val
+                    beta = min(beta,val)
+            return val
 
 
 class Board():
@@ -173,9 +200,31 @@ class Board():
         self.init_state = state
         self.state = state
 
-    def world_to_grid(self):
+    def world_to_grid(self,list):
+        '''recieve list[0,63], index refers to grid square (inorder),elements are 'empty','color1',color2,'color1_king',color2_king'''
         '''Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position.'''
-        pass
+        self.red_piece_count = 0
+        self.black_piece_count = 0
+        state = [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]
+        r = 0
+        c = 0
+        for ele in list:
+            #print('element: '+str(ele))
+            state[r][c] = ele
+            #print(state)
+            if ele < 0:
+                self.black_piece_count += 1
+            elif ele > 0:
+                self.red_piece_count += 1
+            if c == 7:
+                r += 1
+                c = 0
+            else:
+                c += 1
+        self.state = state
+        return state
+
+
 
     def get_moves(self,state,player):
         '''ARGS: player: current players color, used to check moves for only that players moves
@@ -202,10 +251,12 @@ class Board():
                     move = [[row,col],[row+(2*step_r),col+(2*step_c)]]
                     captured = [[row,col],[row+step_r,col+step_c]]
                     cap = True
-                    if self.p == -1: #reduce pices count
+                    if self.p == 1: #reduce pices count
                         self.black_piece_count -= 1
                     else:
                         self.red_piece_count -= 1
+            #if cap == False:
+            #    self.noCapture += 1
             return move,captured,cap
 
         def can_step(r,c,state):
