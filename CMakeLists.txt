@@ -9,6 +9,7 @@ project(checkers)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
+  cv_bridge
   message_generation
   rospy
   smach
@@ -169,6 +170,7 @@ include_directories(
    nodes/moveit_motion_plan
    nodes/pickplace_as
    nodes/smach
+   nodes/bridge
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
