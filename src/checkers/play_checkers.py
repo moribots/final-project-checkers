@@ -396,11 +396,19 @@ class Board():
         for r in range(8):
             for c in range(8):
                 mK,capK = can_step(r,c,state)
+                temp_moves = []
+                #print(mK)
                 for i in range(len(mK)):
                     if len(mK[i]) != 0:
+                        temp_moves.append(mK[i])
                         moves.append(mK[i])
                 for i in range(len(capK)):
                     if len(capK[i]) != 0:
                         capture.append(capK[i])
+                        capture_move = temp_moves
+                        #return temp_moves, capture
+                        #for move in mk
+        if len(capture) != 0:
+            return capture_move, capture
 
         return moves, capture
