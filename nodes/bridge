@@ -283,6 +283,7 @@ class Vision():
         print board_state
         print ("\n")
         cv2.imshow('frame', frame)
+        cv2.waitKey(1)
 
 
 if __name__ == '__main__':
