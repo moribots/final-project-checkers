@@ -29,7 +29,7 @@ class PickPlace():
     def __init__(self):
         # Setup subcriber for Tcb, board to camera frame transform
         # Set queue size to 1 to get most recent data
-        self.subTcb = rospy.Subscriber('/Tcb',
+        self.subTcb = rospy.Subscriber('Tcb',
                                        Pose,
                                        self.callback_Tcb,
                                        queue_size=1)
@@ -498,10 +498,7 @@ class PickPlace():
 
             Returns
         """
-        qt = [
-            pose.orientation.x, pose.orientation.y, pose.orientation.z,
-            pose.orientation.w
-        ]
+        qt = pose.orientation
         R = quaternion_matrix(qt)
         T = np.array([[R[0][0], R[0][1], R[0][2], pose.position.x],
                       [R[1][0], R[1][1], R[1][2], pose.position.y],

@@ -12,6 +12,7 @@ PUBLISHERS: checker_locations_distance and checker_locations_game (A8 through H1
 import numpy as np
 import cv2
 import glob
+import rospy
 import math
 print
 # square width 43.5mm
@@ -120,6 +121,7 @@ while cap.isOpened():
 
         # Find the rotation and translation vectors.
         _, rvecs, tvecs, inliers = cv2.solvePnPRansac(objp, corners2, mtx, dist)
+        R,_ = cv2.Rodrigues(rvecs)
 
         test_imgpts = np.float32([[250,250]]).reshape(-1,2)
 
