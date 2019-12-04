@@ -37,7 +37,7 @@ class CheckersAI():
         self.board.get_piece_count(state)
         moves, cap = self.board.get_moves(state,color)
         print('Legal Moves: '+str(moves))
-        print(moves[0][0])
+        #print(moves[0][0])
         while not valid:
             start_in = raw_input('Enter position of piece you want to move or q to quit: ')
             if start_in == 'q':
@@ -74,8 +74,8 @@ class CheckersAI():
 
     def is_game_over(self,state):
         self.board.get_piece_count(state)
-        print(self.board.black_piece_count)
-        print(self.board.red_piece_count)
+        #print(self.board.black_piece_count)
+        #print(self.board.red_piece_count)
         if self.board.red_piece_count == 0:
             if self.baxter_color == 'black':
                 self.winner = 'baxter'
@@ -104,6 +104,21 @@ class CheckersAI():
         #    print('The winner is '+str(self.winner))
         #return self.game_over
 
+    def grid_to_world(self,move,captured):
+        '''Converts moves from grid coordinates to index of 1-d list refering to board positions
+        assumes left to right, bottom to top from baxter's perspective
+        ARGS:
+            move: list of start and goal postion ([[0,0],[2,2]])
+            captured: list of start and captured piece locations ([[0,0],[1,1]])
+        Returns:
+            movelist: list of indeices corresponding to grid coordinates'''
+        movelist = [move[0][0]*8+move[0][1],move[1][0]*8+move[1][1]]
+        for cap in captured:
+            movelist.append(cap[1][0]*8+cap[1][1])
+        print('Move list: '+str(movelist))
+        return movelist
+
+
 
 
     def make_move(self,move,cap,state):
@@ -111,8 +126,8 @@ class CheckersAI():
         nodes = []
         print('moves: '+str(move))
         if len(cap) != 0:
-            print('captures: '+str(cap[0]))
-            cap = cap[0]
+            print('captures: '+str(cap))
+            #cap = cap[0]
         #for move in moves:
         print(move[0])
         w = 0
@@ -121,13 +136,13 @@ class CheckersAI():
         temp_state[move[0][0]][move[0][1]] = 0
         temp_state[move[1][0]][move[1][1]] = self.board.p #should still be the last players value
 
-        if len(cap) != 0 and cap[0] == move[0]:
-            print('Capture')
-            temp_state[cap[1][0]][cap[1][1]] = 0
-            self.noCapture = 0
+        if len(cap) != 0 and cap[0][0] == move[0]:
+            for piece in cap:
+                print('Capture '+str(piece))
+                temp_state[piece[1][0]][piece[1][1]] = 0
+                self.noCapture = 0
         else:
             self.noCapture += 1 #if it counts too high its a draw
-        #print(temp_state)
         self.is_game_over(temp_state)
         if self.game_over:
             print('Game over: Winner: '+str(self.winner))
@@ -143,6 +158,9 @@ class CheckersAI():
         '''Minimax algorithm to get best moves for baxter
             ARGS: max: (bool) is maximizing player?'''
         state = np.array(self.board.world_to_grid(state_list))
+        #get moves
+        #if only one move: take it
+        #else: prune
         print(state)
         self.path = []
         bestvalue = self.prune(self.alpha,self.beta,state,True)
@@ -157,9 +175,9 @@ class CheckersAI():
         '''Alpha beta pruning to optimize minimax'''
         #self.board.world_to_grid(node)
         #self.board.init_state = node
+        self.is_game_over(node)
         print('black: '+str(self.board.black_piece_count))
         print('red: '+str(self.board.red_piece_count))
-        self.is_game_over(node)
         if self.game_over: #return utility of the node if terminal node
             if self.winner == 'baxter': #returns count of baxter's pieces
                 if self.baxter_color == 'black':
@@ -251,8 +269,6 @@ class Board():
     def world_to_grid(self,list):
         '''recieve list[0,63], index refers to grid square (inorder),elements are 'empty','color1',color2,'color1_king',color2_king'''
         '''Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position.'''
-        #self.red_piece_count = 0
-        #self.black_piece_count = 0
         state = [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]
         r = 0
         c = 0
@@ -296,12 +312,12 @@ class Board():
                     move = [[row,col],[row+(2*step_r),col+(2*step_c)]]
                     captured = [[row,col],[row+step_r,col+step_c]]
                     cap = True
-                    if self.p == 1: #reduce pices count
+                    '''if self.p == 1: #reduce pices count
                         self.black_piece_count -= 1
                         print('black piece captured!')
                     else:
                         self.red_piece_count -= 1
-                        print('Red piece captured!')
+                        print('Red piece captured!')'''
             #if cap == False:
             #    self.noCapture += 1
             return move,captured,cap
@@ -362,6 +378,7 @@ class Board():
             return flip_state
 
         #currently assuming list
+        self.get_piece_count(state)
         moves = []
         temp = []
         capture = []
