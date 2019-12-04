@@ -19,6 +19,7 @@ import moveit_commander
 import moveit_msgs.msg
 import baxter_interface
 from baxter_interface import Gripper, CHECK_VERSION
+from tf import quaternion_matrix
 import tf.transformations as tr
 from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
 from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
@@ -26,6 +27,12 @@ from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
 
 class PickPlace():
     def __init__(self):
+        # Setup subcriber for Tcb, board to camera frame transform
+        # Set queue size to 1 to get most recent data
+        self.subTcb = rospy.Subscriber('/Tcb',
+                                       Pose,
+                                       self.callback_Tcb,
+                                       queue_size=1)
         # Initialise
         rospy.loginfo("Initializing Baxter with MoveIt...")
         # Enable baxter
@@ -63,6 +70,14 @@ class PickPlace():
         # DEBUG: Print Robot State
         self.robot_state = self.robot.get_current_state()
         rospy.loginfo("========== CURRENT STATE: %s" % self.robot_state)
+
+        # Movegroup for Left Arm (Camera)
+        self.cam_group = moveit_commander.MoveGroupCommander("left_arm")
+        self.cam = self.cam_group.get_end_effector_link()
+        # Transformation from Board to Camera Frame (update in subscriber)
+        self.Tcb = np.zeros((4, 4))
+        self.Tcb[2, 2] = 1
+        self.Tcb[3, 3] = 1
 
         # Planning and Execurtion parameters
         self.move_group.set_goal_position_tolerance(0.001)
@@ -127,7 +142,14 @@ class PickPlace():
         self.scene.add_box(self.box_name, self.box_pose, size=(0.6, 0.8, 0.1))
         # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
 
-    def go_to_joint_state(self, j0=-0.76, j1=0.19, j2=1.23, j3=1.95, j4=1.244, j5=-1.33, j6=0.56):
+    def go_to_joint_state(self,
+                          j0=-0.76,
+                          j1=0.19,
+                          j2=1.23,
+                          j3=1.95,
+                          j4=1.244,
+                          j5=-1.33,
+                          j6=0.56):
         """ DESCRIPTION:
 
             Args:
@@ -469,6 +491,33 @@ class PickPlace():
 
         return path_type
 
+    def get_T(self, pose):
+        """ DESCRIPTION:
+
+            Args:
+
+            Returns
+        """
+        qt = [
+            pose.orientation.x, pose.orientation.y, pose.orientation.z,
+            pose.orientation.w
+        ]
+        R = quaternion_matrix(qt)
+        T = np.array([[R[0][0], R[0][1], R[0][2], pose.position.x],
+                      [R[1][0], R[1][1], R[1][2], pose.position.y],
+                      [R[2][0], R[2][1], R[2][2], pose.position.z],
+                      [0, 0, 0, 1]])
+        return T
+
+    def callback_Tcb(self, pose):
+        """ DESCRIPTION:
+
+            Args:
+
+            Returns
+        """
+        self.Tcb = self.get_T(pose)
+
     def execute_cb(self, goal):
         """ DESCRIPTION:
 
@@ -476,6 +525,20 @@ class PickPlace():
 
             Returns
         """
+        # First, get the Transform from EE (camera) to World
+        Tsc = self.get_T(self.cam_group.get_current_pose().pose)
+        # Then, from the subscriber update, get the
+        # Transform from Board to EE (camera)
+        Tcb = self.Tcb
+        # Now get Transform from Board to World
+        Tsb = np.dot(Tsc, Tcb)
+        # Now get cartesian pose of board wrt world frame
+        psb = np.array([Tsb[0, 3], Tsb[1, 3], Tsb[2, 3]])
+        # Now, update goals to be absolute from World to Goal
+        goal.pick_goal[0] += psb[0]
+        goal.pick_goal[1] += psb[1]
+        goal.place_goal[0] += psb[0]
+        goal.place_goal[1] += psb[1]
         # Feedback and Result for Action
         print("Goal Received")
         feedback = PickPlaceFeedback()
