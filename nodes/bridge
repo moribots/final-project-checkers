@@ -1,6 +1,10 @@
 #!/usr/bin/python2
 
-import rospy, cv2, cv_bridge
+import rospy
+import cv2
+import cv_bridge
+import numpy as np
+from tf import quaternion_matrix
 from sensor_msgs.msg import Image
 
 bridge = cv_bridge.CvBridge()  # Initialize CV Bridge object
@@ -12,6 +16,18 @@ def image_callback(ros_img):
     cv_image = bridge.imgmsg_to_cv2(ros_img, desired_encoding="passthrough")
     cv2.imshow('Image', cv_image)  # display image
     cv2.waitKey(1)
+
+
+def get_T(pose):
+    qt = [
+        pose.orientation.x, pose.orientation.y, pose.orientation.z,
+        pose.orientation.w
+    ]
+    R = quaternion_matrix(qt)
+    T = np.array([[R[0][0], R[0][1], R[0][2], pose.position.x],
+                  [R[1][0], R[1][1], R[1][2], pose.position.y],
+                  [R[2][0], R[2][1], R[2][2], pose.position.z], [0, 0, 0, 1]])
+    return T
 
 
 if __name__ == '__main__':

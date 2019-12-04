@@ -64,18 +64,17 @@ catkin_python_setup()
 # )
 
 ## Generate actions in the 'action' folder
- add_action_files(
+add_action_files(
    FILES
    PickPlace.action
-#   Action2.action
- )
+)
 
 ## Generate added messages and services with any dependencies listed here
- generate_messages(
+generate_messages(
    DEPENDENCIES
    # std_msgs  # Or other packages containing msgs
    actionlib_msgs
- )
+)
 
 
 
@@ -110,7 +109,7 @@ catkin_python_setup()
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-  LIBRARIES checkers
+  LIBRARIES ${PROJECT_NAME}
   CATKIN_DEPENDS actionlib_msgs message_runtime moveit rospy smach
 #  DEPENDS system_lib
 )
@@ -165,14 +164,16 @@ include_directories(
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
- install(PROGRAMS
-#   scripts/my_python_script
+install(PROGRAMS
+   #   scripts/my_python_script
+   nodes/bridge
+   nodes/get_baxter_move
    nodes/moveit_motion_plan
    nodes/pickplace_as
    nodes/smach
-   nodes/bridge
+   nodes/vision
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
+)
 
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
