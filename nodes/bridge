@@ -122,13 +122,20 @@ class Vision():
             # Find the rotation and translation vectors.
             _, rvecs, tvecs, inliers = cv2.solvePnPRansac(objp, corners2, mtx, dist)
             R,_ = cv2.Rodrigues(rvecs)
-            quat = tf.transformations.quaternion_from_matrix(R)
+            Rt = np.zeros((4, 4))
+            Rt[0:2, 0:2] = R[0:2, 0:2]
+            Rt[3, 3] = 1
+            quat = tf.transformations.quaternion_from_matrix(Rt)
             # Populate Tranformation Matrix
             Tcb = Pose()
-            Tcb.orientation = quat
-            Tcb.position.x = tvecs[0]
-            Tcb.position.y = tvecs[1]
-            Tcb.position.z = tvecs[2]
+            Tcb.orientation.x = quat[0]
+            Tcb.orientation.y = quat[1]
+            Tcb.orientation.z = quat[2]
+            Tcb.orientation.w = quat[3]
+            Tcb.position.x = tvecs[0][0]
+            Tcb.position.y = tvecs[1][0]
+            Tcb.position.z = tvecs[2][0]
+            print(Tcb)
             # Now Publish Transformation Matrix
             self.pub.publish(Tcb)
 
