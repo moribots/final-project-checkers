@@ -166,15 +166,15 @@ class MOVE(smach.State):
 
         # Call AS to perform pick-place per move
         # FOR EACH BAXTER MOVE
-        pick_goal = [0.5, 0.0]
-        place_goal = [0.6, 0.0]
+        pick_goal = [0, 0]  # [0.5 * 0.0559, -0.5 * 0.0559]
+        place_goal = [0, 0]
         home = False
         self.pp_goal(pick_goal, place_goal, home)
 
         # Call AS to perform pick-place per discard
         # FOR EACH BAXTER DISCARD
-        pick_goal = [0.6, 0.0]
-        place_goal = [0.5, 0.0]
+        pick_goal = [0, 0]
+        place_goal = [0, 0]
         home = False
         self.pp_goal(pick_goal, place_goal, home)
 

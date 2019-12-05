@@ -26,12 +26,6 @@ from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
 
 class PickPlace():
     def __init__(self):
-        # Setup subcriber for Tcb, board to camera frame transform
-        # Set queue size to 1 to get most recent data
-        self.subTcb = rospy.Subscriber('Tcb',
-                                       Pose,
-                                       self.callback_Tcb,
-                                       queue_size=1)
         # Initialise
         rospy.loginfo("Initializing Baxter with MoveIt...")
         # Enable baxter
@@ -77,10 +71,23 @@ class PickPlace():
         # 0.08590292412158317, 1.6256361399615673, -1.666670126037502, -0.08130098175792692, 2.1053886313727306, -0.23700003172829642, -1.339932218217909
         #- right_e0 - right_e1 - right_s0 - right_s1 - right_w0 - right_w1 - right_w2
 
+        # Setup subcriber for Tcb, board to camera frame transform
+        # Set queue size to 1 to get most recent data
+        self.count = 0
         # Transformation from Board to Camera Frame (update in subscriber)
         self.Tcb = np.zeros((4, 4))
         self.Tcb[2, 2] = 1
         self.Tcb[3, 3] = 1
+        self.pcb = [0, 0]
+
+        self.Tsc = np.zeros((4, 4))
+        self.Tsc[2, 2] = 1
+        self.Tsc[3, 3] = 1
+        self.psc = [0, 0]
+        self.subTcb = rospy.Subscriber('Tcb',
+                                       Pose,
+                                       self.callback_Tcb,
+                                       queue_size=1)
 
         # Planning and Execurtion parameters
         self.move_group.set_goal_position_tolerance(0.001)
@@ -509,11 +516,12 @@ class PickPlace():
         q = pose.orientation
         qt = [q.x, q.y, q.z, q.w]
         R = tr.quaternion_matrix(qt)
+        p = [pose.position.x, pose.position.y]
         T = np.array([[R[0][0], R[0][1], R[0][2], pose.position.x],
                       [R[1][0], R[1][1], R[1][2], pose.position.y],
                       [R[2][0], R[2][1], R[2][2], pose.position.z],
                       [0, 0, 0, 1]])
-        return T
+        return T, p
 
     def callback_Tcb(self, pose):
         """ DESCRIPTION:
@@ -522,7 +530,11 @@ class PickPlace():
 
             Returns
         """
-        self.Tcb = self.get_T(pose)
+        # rospy.loginfo(pose)
+        if self.count == 0:
+            self.Tcb, self.pcb = self.get_T(pose)
+            self.Tsc, self.psc = self.get_T(self.cam_group.get_current_pose().pose)
+            self.count = 1
 
     def execute_cb(self, goal):
         """ DESCRIPTION:
@@ -532,21 +544,28 @@ class PickPlace():
             Returns
         """
         # First, get the Transform from EE (camera) to World
-        Tsc = self.get_T(self.cam_group.get_current_pose().pose)
+        rospy.loginfo("EE CAM POSE")
+        rospy.loginfo(self.cam_group.get_current_pose().pose)
         # Then, from the subscriber update, get the
         # Transform from Board to EE (camera)
-        Tcb = self.Tcb
         # Now get Transform from Board to World
-        Tsb = np.dot(Tsc, Tcb)
+        Tsb = np.matmul(self.Tsc, self.Tcb)
+        rospy.loginfo("TSB:")
+        rospy.loginfo(Tsb)
         # Now get cartesian pose of board wrt world frame
-        psb = np.array([Tsb[0, 3], Tsb[1, 3], Tsb[2, 3]])
+        # psb = np.array([Tsb[0, 3], Tsb[1, 3], Tsb[2, 3]])
+        psb = [self.psc[0] + self.pcb[0], self.psc[1] + self.pcb[1]]
+        rospy.loginfo("POSE WRT BAXTER:")
+        rospy.loginfo(psb)
         # Now, update goals to be absolute from World to Goal
         pick_goal = [goal.pick_goal[0], goal.pick_goal[1]]
         pick_goal[0] += psb[0]
         pick_goal[1] += psb[1]
+        print("PICK GOAL:".format(pick_goal))
         place_goal = [goal.place_goal[0], goal.place_goal[1]]
         place_goal[0] += psb[0]
         place_goal[1] += psb[1]
+        print("PLACE GOAL:".format(place_goal))
         # Feedback and Result for Action
         print("Goal Received")
         feedback = PickPlaceFeedback()
@@ -558,7 +577,8 @@ class PickPlace():
             pick_result = ""
             place_result = ""
         else:
-
+            pick_result = ""
+            place_result = ""
             # Execute Pick Routine
             pick_result = self.pick_cartesian(pick_goal, feedback)
 
