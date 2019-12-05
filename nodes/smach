@@ -28,19 +28,30 @@ class Client():
                                                       PickPlaceAction)
         # Wait for server response
         self.pp_client.wait_for_server()
+        rospy.loginfo("Server Initialised!")
         # Initialise goal msg
-        self.goal = PickPlaceGoal()
+        self.pp_goal = PickPlaceGoal()
+
+    def feedback_pp(self, msg):
+        # do something here
+        rospy.loginfo("Completed Moves: {}".format(msg))
 
 
 class SETUP(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['initialised'])
+    # Pass Client Object in State init
+    def __init__(self, client):
+        smach.State.__init__(self,
+                             outcomes=['initialised'])
+        # Initialise client
+        self.client = client
 
     def execute(self, userdata):
         rospy.loginfo('Initialising...')
         # Call Camera Calibration AS
+        # userdata.client.cc_client.send  goal
 
         # Call EE-Board Transform AS
+        # userdata.client.ee_client.send goal
 
         # Display on screen: please set up the board and
         # hit enter when ready
@@ -51,12 +62,19 @@ class SETUP(smach.State):
 
 
 class PICKCOLOR(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['red', 'black'])
+    # Pass Client Object in State init
+    def __init__(self, client):
+        smach.State.__init__(self,
+                             outcomes=['red', 'black'])
+        # Initialise client
+        self.client = client
 
     def execute(self, userdata):
         rospy.loginfo('Determining who goes first...')
         # Call AS to determine if baxter is red or black
+        # userdata.client.pc_client.send goal
+        # userdata.client.pc_client.wait_for_result()
+        # result = userdata.client.pc_client.get_result()
         if True is True:
             return 'black'
         else:
@@ -75,12 +93,21 @@ class WAIT(smach.State):
 
 
 class MYTURN(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['move', 'exit'])
+    # Pass Client Object in State init
+    def __init__(self, client):
+        smach.State.__init__(self,
+                             outcomes=['move', 'exit'],
+                             output_keys=['board_state'])
+        # Initialise client
+        self.client = client
 
     def execute(self, userdata):
         rospy.loginfo('Reading board state')
         # Call AS to read board state and feed data to logic
+        # userdata.client.boardstate_client.send goal
+        # userdata.client.board_client.wait_for_result()
+        # result = userdata.client.boardstate_client.get_result()
+        # userdata.board_state = result
         rospy.loginfo("Let's see how well you played...")
 
         # Call logic function to determine win/lose
@@ -99,13 +126,61 @@ class MYTURN(smach.State):
 
 
 class MOVE(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['wait', 'exit'])
+    # Place Client Object in State init
+    def __init__(self, client):
+        smach.State.__init__(self,
+                             outcomes=['wait', 'exit'],
+                             input_keys=['board_state'])
+        # Initialise client
+        self.client = client
+
+    def pp_goal(self, pick_goal=[0, 0], place_goal=[0, 0], home=True):
+        """ DESCRIPTION
+
+            Args:
+
+            Returns:
+        """
+        if home is True:
+            self.client.pp_goal.home = home
+            self.client.pp_client.send_goal(self.client.pp_goal)
+            self.client.pp_client.wait_for_result()
+            rospy.loginfo("Returned to Home Position")
+
+        else:
+            self.client.pp_goal.pick_goal = pick_goal
+            self.client.pp_goal.place_goal = place_goal
+            # Set home to false to make sure pick place executes
+            self.client.pp_goal.home = home
+            self.client.pp_client.send_goal(
+                self.client.pp_goal, feedback_cb=self.client.feedback_pp)
+            self.client.pp_client.wait_for_result()
+            cart = self.client.pp_client.get_result()
+            rospy.loginfo("Cartesian path {}".format(cart))
 
     def execute(self, userdata):
         # Call Logic fcn to determine next move
+        # userdata.client.move_client.send goal board_state
+        # userdata.client.move_client.wait_for_result()
+        # result = userdata.client.move_client.get_result()
 
-        # Call AS to perform pick-place
+        # Call AS to perform pick-place per move
+        # FOR EACH BAXTER MOVE
+        pick_goal = [0.6, 0.0]
+        place_goal = [0.5, 0.0]
+        home = False
+        self.pp_goal(pick_goal, place_goal, home)
+
+        # Call AS to perform pick-place per discard
+        # FOR EACH BAXTER DISCARD
+        pick_goal = [0.6, 0.0]
+        place_goal = [0.5, 0.0]
+        home = False
+        self.pp_goal(pick_goal, place_goal, home)
+
+        # Call AS to go home to clear board for camera
+        # Defaults to go home
+        self.pp_goal()
 
         # Call logic function to determine win/lose
         end_game = False
@@ -129,6 +204,8 @@ class SHUTDOWN(smach.State):
     def execute(self, userdata):
         rospy.loginfo('Disabling Baxter...')
         # Disable Baxter
+        baxter_interface.robot_enable.RobotDisable()
+        rospy.loginfo("Baxter Disabled!")
 
         return 'end'
 
@@ -171,11 +248,11 @@ def main():
     with sm_top:
         # Setup State
         smach.StateMachine.add('SETUP',
-                               SETUP(),
+                               SETUP(client),
                                transitions={'initialised': 'PICKCOLOR'})
         # Pick Color State
         smach.StateMachine.add('PICKCOLOR',
-                               PICKCOLOR(),
+                               PICKCOLOR(client),
                                transitions={
                                    'red': 'MYTURN',
                                    'black': 'WAIT'
@@ -184,26 +261,42 @@ def main():
         smach.StateMachine.add('WAIT', WAIT(), transitions={'play': 'MYTURN'})
         # My Turn State
         smach.StateMachine.add('MYTURN',
-                               MYTURN(),
+                               MYTURN(client),
                                transitions={
                                    'move': 'MOVE',
                                    'exit': 'SHUTDOWN'
+                               },
+                               remapping={
+                                   'board_state': 'board_state'
                                })
         # Move State
         smach.StateMachine.add('MOVE',
-                               MOVE(),
+                               MOVE(client),
                                transitions={
                                    'wait': 'WAIT',
                                    'exit': 'SHUTDOWN'
+                               },
+                               remapping={
+                                   'board_state': 'board_state'
                                })
         # Shutdown State
         smach.StateMachine.add('SHUTDOWN',
                                SHUTDOWN(),
                                transitions={'end': 'end'})
 
+    # SMACH Viewer
+    # Create and start the introspection server
+    # sis = smach_ros.IntrospectionServer('checkers_smach', sm_top, '/CHECKERS')
+    # sis.start()
     # Execute SMACH plan
-    outcome = sm_top.execute()
+    sm_top.execute()
+
+    # rospy.spin()
+    # sis.stop()
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except rospy.ROSInterruptException:
+        pass

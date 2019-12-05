@@ -3,6 +3,7 @@
 # e.g [[0.0, 0.0], [1.0, 1.0]]
 float32[] pick_goal
 float32[] place_goal
+bool home
 
 ---
 # Result
