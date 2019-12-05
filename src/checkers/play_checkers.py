@@ -24,10 +24,10 @@ class CheckersAI():
                  [ 0, 1, 0, 1, 0, 1, 0, 1]]
         self.board = Board()
 
-    def give_command(self,state,color):
+    def give_command(self,state):#,color):
         '''ARGS:
                 board: Board object that stores the positions of the pieces on the board, used to check if the move is legal
-                color: designates what color the player is, used for get_moves
+                color: designates what color the player is, used for get_moves (only used in testing)
            Returns:
                 start: Grid position of the piece to move
                 goal: Grid position of where to move the piece to
@@ -36,7 +36,7 @@ class CheckersAI():
         captured = []
         state = self.board.world_to_grid(state)
         self.board.get_piece_count(state)
-        moves, cap = self.board.get_moves(state,color)
+        moves, cap = self.board.get_moves(state,self.board.baxter_color)
         print('Legal Moves in python indicies so add 1 to each value: '+str(moves))
         #print(moves[0][0])
         while not valid:
@@ -51,7 +51,7 @@ class CheckersAI():
                 try:
                     start[i] = int(start[i])-1 #convert to python counting convention
                     goal[i] = int(goal[i])-1 #convert to python counting convention
-                except ValueError:
+                except ValueError, IndexError:
                     print('\nEntered move is not in valid format. Please enter two integers seperated by a comma\n')
                     valid = False
             for move in moves:
@@ -78,20 +78,20 @@ class CheckersAI():
         #print(self.board.black_piece_count)
         #print(self.board.red_piece_count)
         if self.board.red_piece_count == 0:
-            if self.baxter_color == 'black':
+            if self.board.baxter_color == 'black':
                 self.winner = 'baxter'
             else:
                 self.winner = 'not_baxter'
             self.game_over = True
         elif self.board.black_piece_count == 0:
-            if self.baxter_color == 'red':
+            if self.board.baxter_color == 'red':
                 self.winner = 'baxter'
             else:
                 self.winner = 'not_baxter'
             self.game_over = True
         elif self.board.get_moves(state,self.whos_turn) == None:
             self.switch_turn()
-            if self.whos_turn == self.baxter_color:
+            if self.whos_turn == self.board.baxter_color:
                 self.winner = 'baxter'
             else:
                 self.winner = 'not_baxter'
@@ -113,9 +113,9 @@ class CheckersAI():
             captured: list of start and captured piece locations ([[0,0],[1,1]])
         Returns:
             movelist: list of indeices corresponding to grid coordinates'''
-        movelist = [move[0][0]*8+move[0][1],move[1][0]*8+move[1][1]]
+        movelist = [63-move[0][0]*8+move[0][1],63-move[1][0]*8+move[1][1]]
         for cap in captured:
-            movelist.append(cap[1][0]*8+cap[1][1])
+            movelist.append(63-cap[1][0]*8+63-cap[1][1])
         print('Move list: '+str(movelist))
         return movelist
 
@@ -239,7 +239,7 @@ class CheckersAI():
                 print('child:\n '+str(np.array(child)))
                 print('recursing_min')
                 val = min((self.prune(alpha,beta,child,'max',level-1)),val)
-                self.path.append([self.not_baxter,move],val])
+                self.path.append([self.not_baxter,move,val])
                 print('value: '+str(val))
                 print('beta: '+str(beta))
                 node = self.undo_move(move,cap,captured,child)
@@ -258,8 +258,20 @@ class Board():
     def __init__(self):#,state):
         self.red_piece_count = 0
         self.black_piece_count = 0
+        self.baxter_color = None
         #self.init_state = state
         #self.state = state
+
+    def flip_board(self,state):
+        '''Args:
+             state: a array representation of a board state.
+           Returns:
+             flip_state: the same board with the first index corresponding to the corner diagonally opposite.
+            Flips the board so the board is in the perspective of whichever players turn it is'''
+        flip_state = state[::-1]
+        #for l in range(len(flip_state)): #this loop assumes baxter is dark
+        #    flip_state[l] = flip_state[l][::-1]
+        return flip_state
 
     def get_piece_count(self,state):
         self.red_piece_count = 0
@@ -272,22 +284,37 @@ class Board():
                     self.red_piece_count += 1
 
     def world_to_grid(self,list):
-        '''recieve list[0,63], index refers to grid square (inorder),elements are 'empty','color1',color2,'color1_king',color2_king'''
+        '''recieve list[0,63], left to right, top to bottom from top left of board, index refers to grid square (inorder),elements are 'empty','color1',color2,'color1_king',color2_king'''
         '''Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position.'''
         state = [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]
         r = 0
         c = 0
         for ele in list:
             #print('element: '+str(ele))
-            state[r][c] = ele
+            if ele == 'purple' or ele == 'black':
+                piece = -1
+            elif ele == 'green' or ele == 'red':
+                piece = 1
+            else:
+                piece = 0
+            state[r][c] = piece
             #print(state)
             if c == 7:
                 r += 1
                 c = 0
             else:
                 c += 1
+        state = self.flip_board(state)
+        if self.baxter_color == None:
+            if state[0][0] == 1: #colors determined here !!
+                self.baxter_color = 'red'
+                self.not_baxter = 'black'
+            elif state[0][0] == -1:
+                self.baxter_color = 'black'
+                self.not_baxter = 'red'
         self.init_state = state
         self.get_piece_count(state)
+        print(state)
         return state
 
 
@@ -334,9 +361,10 @@ class Board():
             step = []
             #set possible steps based on whether a pawn or king and which player
             if state[r][c] == self.p and self.p == -1:
-                step = [[1,1],[1,-1]]
-            elif state[r][c] == self.p and self.p == 1:
                 step = [[-1,1],[-1,-1]]
+            elif state[r][c] == self.p and self.p == 1:
+                step = [[1,1],[1,-1]]
+
             if state[r][c] == self.p*2:
                 step = [[1,1],[1,-1],[-1,1],[-1,-1]]
                 #print('King')
@@ -365,16 +393,7 @@ class Board():
 
             return moves, capture
 
-        '''def flip_board(state):
-            Args:
-                 state: a array representation of a board state.
-               Returns:
-                 flip_state: the same board with the first index corresponding to the corner diagonally opposite.
-                Flips the board so the board is in the perspective of whichever players turn it is
-            flip_state = state[::-1]
-            for l in range(len(flip_state)):
-                flip_state[l] = flip_state[l][::-1]
-            return flip_state'''
+
 
         #currently assuming list
         self.get_piece_count(state)
@@ -383,14 +402,14 @@ class Board():
         capture = []
         steps = [[1,-1],[1,1]]
         self.step_r = 1
-        if player.lower() == 'black': #state is always read in starting with dark color first since black player goes first
+        if player.lower() == self.baxter_color: #state is always read from baxter's perspective! wrong:in starting with dark color first since black player goes first
             #Black is -1
-            self.p = -1
-            self.not_p = 1
+            self.p = 1
+            self.not_p = -1
         else:
             #state = flip_board(state)
-            self.p = 1 #Red is +1
-            self.not_p = -1
+            self.p = -1 #Red is +1
+            self.not_p = 1
         #cycle through grid cells
         for r in range(8):
             for c in range(8):
