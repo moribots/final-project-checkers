@@ -283,12 +283,14 @@ class Board():
                 elif col_ele > 0:
                     self.red_piece_count += 1
 
-    def world_to_grid(self,list):
+    def world_to_grid(self,string):
         '''recieve list[0,63], left to right, top to bottom from top left of board, index refers to grid square (inorder),elements are 'empty','color1',color2,'color1_king',color2_king'''
         '''Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position.'''
         state = [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]
         r = 0
         c = 0
+        list = string.split(' ')
+        #print(list)
         for ele in list:
             #print('element: '+str(ele))
             if ele == 'purple' or ele == 'black':

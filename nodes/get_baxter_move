@@ -9,14 +9,10 @@ if __name__ == '__main__':
     print('RULES: Grid squares start counting from Baxter\'s left corner (Ex. 3,3 = third column and third row from Baxter\'s left corner)\nDark player gos first. \
     If you double jump, put only the start position and the goal position after the double jump. \n')
     #  state list will come from CV
-    top_to_bottom = ['empty', 'purple','empty', 'purple','empty', 'purple','empty', 'purple',
-              'purple', 'empty', 'purple','empty', 'purple','empty' ,'purple','empty',
-              'empty', 'purple' ,'empty', 'purple','empty', 'purple','empty', 'purple',
-              'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty',
-              'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty',
-              'green', 'empty', 'green', 'empty', 'green', 'empty', 'green', 'empty',
-              'empty', 'green', 'empty', 'green', 'empty', 'green', 'empty', 'green',
-              'green', 'empty', 'green', 'empty', 'green', 'empty', 'green', 'empty'] #<== baxters side
+    top_to_bottom = 'empty purple empty purple empty purple empty purple purple empty purple empty purple empty purple empty empty purple empty purple empty purple empty purple \
+empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty \
+green empty green empty green empty green empty empty green empty green empty green empty green \
+green empty green empty green empty green empty' #<== baxters side
     bottom_to_top = top_to_bottom[::-1]
     #print(bottom_to_top)
     '''state = [[-1, 0,-1, 0,-1, 0,-1, 0],
