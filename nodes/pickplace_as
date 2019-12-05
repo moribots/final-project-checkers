@@ -73,6 +73,10 @@ class PickPlace():
         # Movegroup for Left Arm (Camera)
         self.cam_group = moveit_commander.MoveGroupCommander("left_arm")
         self.cam = self.cam_group.get_end_effector_link()
+        # Left arm desired joints
+        # 0.08590292412158317, 1.6256361399615673, -1.666670126037502, -0.08130098175792692, 2.1053886313727306, -0.23700003172829642, -1.339932218217909
+        #- right_e0 - right_e1 - right_s0 - right_s1 - right_w0 - right_w1 - right_w2
+
         # Transformation from Board to Camera Frame (update in subscriber)
         self.Tcb = np.zeros((4, 4))
         self.Tcb[2, 2] = 1
