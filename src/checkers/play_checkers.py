@@ -124,25 +124,21 @@ class CheckersAI():
 
     def make_move(self,move,cap,state):
         '''make a array of board states (nodes) after all legal moves starting from current state. include whether or not the node is terminal'''
-        print(state)
         if len(state) > 8:
             print('world_to_grid')
             state = self.board.world_to_grid(state)
         print('moves: '+str(move))
-        #if len(cap) != 0:
         print('captures: '+str(cap))
-            #cap = cap[0]
-        #for move in moves:
-        print(move[0])
-        w = 0
-        print(state)#np.array(self.board.state)) #initial state
-        #state = state[:]#self.board.state[:]
+        K = 1
+        if self.board.p == 1 and move[1][0] == 0 or self.board.p == -1 and move[1][0] == 7 or state[move[0][0]][move[0][1]] == self.board.p*2:
+            K = 2
         state[move[0][0]][move[0][1]] = 0
-        state[move[1][0]][move[1][1]] = self.board.p #should still be the last players value
-
+        state[move[1][0]][move[1][1]] = K*self.board.p #should still be the last players value
+        captured = []
         if len(cap) != 0 and cap[0][0] == move[0]:
             for piece in cap:
                 print('Capture '+str(piece))
+                captured.append(state[piece[1][0]][piece[1][1]])
                 state[piece[1][0]][piece[1][1]] = 0
                 self.noCapture = 0
         else:
@@ -150,40 +146,51 @@ class CheckersAI():
         self.is_game_over(state)
         if self.game_over:
             print('Game over: Winner: '+str(self.winner))
-            w = 1
         #nodes.append([move,temp_state,w])
-        #self.board.state = self.board.init_state[:]
-        #nodes = temp_state[:]
-        #print(np.array(nodes))
-        return state
+        return state,captured
 
+    def undo_move(self,move,cap,cap_piece,state):
+        K = 1
+        if state[move[1][0]][move[1][1]] == self.board.p*2: #only have to worry about piece before move
+            K = 2
+        state[move[1][0]][move[1][1]] = 0
+        state[move[0][0]][move[0][1]] = K*self.board.p #should still be the last players value
+        if len(cap) != 0 and cap[0][0] == move[0]:
+            for i in range(len(cap)):
+                #print('Capture '+str(piece))
+                state[cap[i][1][0]][cap[i][1][1]] = cap_piece[i]
+                self.noCapture -= 1
+        return state
 
     def minimax(self,state_list):
         '''Minimax algorithm to get best moves for baxter
             ARGS: max: (bool) is maximizing player?'''
         state = np.array(self.board.world_to_grid(state_list))
-        moves,cap,s = self.board.get_moves(state,self.baxter_color)
+        moves,cap = self.board.get_moves(state,self.baxter_color)
         if len(moves) == 1: return moves, cap
         else:
             print(state)
             self.path = []
-            bestvalue = self.prune(self.alpha,self.beta,state,True,3)
-            print(bestvalue)
+            bestvalue = self.prune(self.alpha,self.beta,state,'max',3)
+            print('Best_value: '+str(bestvalue))
+            print(self.path)
         best_move = []
 
 
 
 
 
-    def prune(self,alpha,beta,node,max,level): #based on pseudocode from https://www.hackerearth.com/blog/developers/minimax-algorithm-alpha-beta-pruning/
+    def prune(self,alpha,beta,node,is_max,level): #based on pseudocode from https://www.hackerearth.com/blog/developers/minimax-algorithm-alpha-beta-pruning/
         '''Alpha beta pruning to optimize minimax'''
         #self.board.world_to_grid(node)
         #self.board.init_state = node
         val = 0
+        print('Level: '+str(level))
         self.is_game_over(node)
-        print('black: '+str(self.board.black_piece_count))
-        print('red: '+str(self.board.red_piece_count))
-        if self.game_over or level == 0: #return utility of the node if terminal node
+        #print('black: '+str(self.board.black_piece_count))
+        #print('red: '+str(self.board.red_piece_count))
+        if self.game_over: #return utility of the node if terminal node
+            print('GAMEOVER')
             if self.winner == 'baxter': #returns count of baxter's pieces
                 if self.baxter_color == 'black':
                     val = self.board.black_piece_count
@@ -196,50 +203,53 @@ class CheckersAI():
                     val = self.board.red_piece_count
             else:
                 val = 0 #if draw score is zero
-            self.path.append([node,val])
+            #self.path.append([move_taken,val])
+            print('returning '+str(val))
             return val
 
-        if max: #baxter is maximizing
+        if is_max == 'max': #baxter is maximizing
             print('Max turn')
             print(self.baxter_color)
-            moves,cap,s = self.board.get_moves(node,self.baxter_color) #gets moves for current node
-            print('Nodes:')
-            print(moves)
-            #print(np.array(nodes[0][1]))
-            print(np.array(node))
-            print('\n')
-
+            moves,cap = self.board.get_moves(node,self.baxter_color) #gets moves for current node
             val = alpha
             for move in moves:
-                child = self.make_move(move,cap,node)
-                print('child:\n '+str(np.array(child)))
-                val = max(self.prune(alpha,beta,child,False,level-1),val)
+                child,captured = self.make_move(move,cap,node)
+                print('child:\n '+str(child))
+                print('recursing_max')
+                val = max(val,(self.prune(alpha,beta,child,'min',level-1)))
+                self.path.append([self.baxter_color,move,val])
                 print('value: '+str(val))
-                print('beta: '+str(beta))
+                print('alpha: '+str(alpha))
+                node = self.undo_move(move,cap,captured,child)
                 if beta <= val: #don't update alpha and prune if its greater than beta
-                    print('returning val')
+                    print('returning_val_max: '+str(val))
+                    print('not_recursing_max')
                     return val
                 alpha = max(alpha,val)
+            print('returning val (max): '+str(val))
+            print('not recursing max')
             return val
         else: #minimizing player
             print(self.not_baxter)
-            print('before')
-            print(node)
-            moves, cap, test_s = self.board.get_moves(node,self.not_baxter) #gets moves for current node
-            print('after')
-            print(node)
-            print(test_s)
+            moves, cap = self.board.get_moves(node,self.not_baxter) #gets moves for current node
+            #print(node)
             val = beta
             for move in moves:
-                child = self.make_move(move,cap,node)
+                child,captured = self.make_move(move,cap,node)
                 print('child:\n '+str(np.array(child)))
-                val = min(self.prune(alpha,beta,test_s,False,level-1),val)
+                print('recursing_min')
+                val = min((self.prune(alpha,beta,child,'max',level-1)),val)
+                self.path.append([self.not_baxter,move,val])
                 print('value: '+str(val))
                 print('beta: '+str(beta))
+                node = self.undo_move(move,cap,captured,child)
                 if val <= alpha: #don't update alpha and prune if its greater than beta
-                    print('returning val')
+                    print('returning_val_min: '+str(val))
+                    print('not_recursing_min')
                     return val
                 beta = min(beta,val)
+            print('returning val (min): '+str(val))
+            print('not recursing min')
             return val
 
 
