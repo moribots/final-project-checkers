@@ -239,7 +239,7 @@ class CheckersAI():
                 print('child:\n '+str(np.array(child)))
                 print('recursing_min')
                 val = min((self.prune(alpha,beta,child,'max',level-1)),val)
-                self.path.append([self.not_baxter,move,val])
+                self.path.append([self.not_baxter,move],val])
                 print('value: '+str(val))
                 print('beta: '+str(beta))
                 node = self.undo_move(move,cap,captured,child)

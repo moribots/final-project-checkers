@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+
+import rospy
+import actionlib
+#from action.msg import
+from checkers.play_checkers import CheckersAI, Board
+
+
+class TAKETURN():
+    def __init__(self,ai):
+        self.turn_server = actionlib.SimpleActionServer('take_turn_as',TakeTurnAction,callback=self.take_turn,auto_start=False)
+
+    def take_turn(self):
+        '''Get board state
+           check if game is over
+           Get legal moves for that state
+           use minimax
+                get sequnces of legal moves and their score
+                prune
+                get bestvalue
+            return move
+            check if game is over
+            '''
+        ai.board.init_state = [[-1, 0,-1, 0,-1, 0,-1, 0],
+                 [ 0,-1, 0,-1, 0,-1 ,0,-1],
+                 [-1, 0,-1, 0,-1, 0,-1, 0],
+                 [ 0, 0, 0, 0, 0, 0, 0, 0],
+                 [ 0, 0, 0, 0, 0, 0, 0, 0],
+                 [ 0, 1, 0, 1, 0, 1, 0, 1],
+                 [ 1, 0, 1, 0, 1, 0, 1, 0],
+                 [ 0, 1, 0, 1, 0, 1, 0, 1]]#ai.board.world_to_grid() #get init_state of turn from CV
+        state = ai.board.init_state[:]
+        moves,cap = ai.board.get_moves(state,ai.baxter_color)
+        tree = ai.apply_moves(moves)
+        minimax
