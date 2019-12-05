@@ -24,7 +24,7 @@ class CheckersAI():
                  [ 0, 1, 0, 1, 0, 1, 0, 1]]
         self.board = Board()
 
-    def give_command(self,state):#,color):
+    def give_command(self,state,color):
         '''ARGS:
                 board: Board object that stores the positions of the pieces on the board, used to check if the move is legal
                 color: designates what color the player is, used for get_moves (only used in testing)
@@ -36,7 +36,7 @@ class CheckersAI():
         captured = []
         state = self.board.world_to_grid(state)
         self.board.get_piece_count(state)
-        moves, cap = self.board.get_moves(state,self.board.baxter_color)
+        moves, cap = self.board.get_moves(state,color)#self.board.baxter_color)
         print('Legal Moves in python indicies so add 1 to each value: '+str(moves))
         #print(moves[0][0])
         while not valid:
@@ -99,6 +99,7 @@ class CheckersAI():
         elif self.noCapture > 50:
             self.winner = 'Draw'
             self.game_over = True
+        print('Is game over? '+str(self.game_over))
         #if self.game_over:
         #    if self.winner == 'Draw':
         #        print()
@@ -113,9 +114,9 @@ class CheckersAI():
             captured: list of start and captured piece locations ([[0,0],[1,1]])
         Returns:
             movelist: list of indeices corresponding to grid coordinates'''
-        movelist = [63-move[0][0]*8+move[0][1],63-move[1][0]*8+move[1][1]]
+        movelist = [move[0][0]*8+move[0][1],move[1][0]*8+move[1][1]]
         for cap in captured:
-            movelist.append(63-cap[1][0]*8+63-cap[1][1])
+            movelist.append(cap[1][0]*8+cap[1][1])
         print('Move list: '+str(movelist))
         return movelist
 
@@ -165,15 +166,15 @@ class CheckersAI():
     def minimax(self,state_list):
         '''Minimax algorithm to get best moves for baxter
             ARGS: max: (bool) is maximizing player?'''
-        state = np.array(self.board.world_to_grid(state_list))
-        moves,cap = self.board.get_moves(state,self.baxter_color)
+        state = self.board.world_to_grid(state_list)
+        moves,cap = self.board.get_moves(state,self.board.baxter_color)
         if len(moves) == 1: return moves, cap
         else:
-            print(state)
+            #print(state)
             self.path = []
-            bestvalue = self.prune(self.alpha,self.beta,state,'max',3)
+            bestvalue = self.prune(self.alpha,self.beta,state,'max',0)
             print('Best_value: '+str(bestvalue))
-            print(self.path)
+            # print(self.path)
         best_move = []
 
 
@@ -185,72 +186,85 @@ class CheckersAI():
         #self.board.world_to_grid(node)
         #self.board.init_state = node
         val = 0
-        print('Level: '+str(level))
+        #print('Level: '+str(level))
         self.is_game_over(node)
         #print('black: '+str(self.board.black_piece_count))
         #print('red: '+str(self.board.red_piece_count))
-        if self.game_over: #return utility of the node if terminal node
+        if self.game_over: #or level > 20: #return utility of the node if terminal node
             print('GAMEOVER')
             if self.winner == 'baxter': #returns count of baxter's pieces
-                if self.baxter_color == 'black':
+                if self.board.baxter_color == 'black':
                     val = self.board.black_piece_count
                 else:
                     val = self.board.red_piece_count
             elif self.winner == 'not_baxter': #return the count of not baxter's pieces
-                if self.not_baxter == 'black':
+                if self.board.not_baxter == 'black':
                     val = self.board.black_piece_count
                 else:
                     val = self.board.red_piece_count
             else:
                 val = 0 #if draw score is zero
             #self.path.append([move_taken,val])
-            print('returning '+str(val))
+            print('\nreturning '+str(val))
             return val
 
         if is_max == 'max': #baxter is maximizing
-            print('Max turn')
-            print(self.baxter_color)
-            moves,cap = self.board.get_moves(node,self.baxter_color) #gets moves for current node
-            val = alpha
+            # print('Max turn '+str(level))
+            #print(self.baxter_color)
+            moves,cap = self.board.get_moves(node,self.board.baxter_color) #gets moves for current node
+            #val = alpha
+            count = 0
+            print(moves)
             for move in moves:
-                child,captured = self.make_move(move,cap,node)
-                print('child:\n '+str(child))
-                print('recursing_max')
-                val = max(val,(self.prune(alpha,beta,child,'min',level-1)))
-                self.path.append([self.baxter_color,move,val])
-                print('value: '+str(val))
-                print('alpha: '+str(alpha))
-                node = self.undo_move(move,cap,captured,child)
-                if beta <= val: #don't update alpha and prune if its greater than beta
-                    print('returning_val_max: '+str(val))
-                    print('not_recursing_max')
-                    return val
-                alpha = max(alpha,val)
-            print('returning val (max): '+str(val))
-            print('not recursing max')
-            return val
-        else: #minimizing player
-            print(self.not_baxter)
-            moves, cap = self.board.get_moves(node,self.not_baxter) #gets moves for current node
-            #print(node)
-            val = beta
-            for move in moves:
+                print('next move')
+                count += 1
                 child,captured = self.make_move(move,cap,node)
                 print('child:\n '+str(np.array(child)))
-                print('recursing_min')
-                val = min((self.prune(alpha,beta,child,'max',level-1)),val)
-                self.path.append([self.not_baxter,move,val])
-                print('value: '+str(val))
-                print('beta: '+str(beta))
+                #print('recursing_max')
+                #print((self.prune(alpha,beta,child,'min',level-1)))
+                alpha = max(alpha,(self.prune(alpha,beta,child,'min',level+1)))
+                self.path.append([self.board.baxter_color,move,alpha])
+                #print('value: '+str(val))
+                # print('alpha: '+str(alpha))
+                # print('for Move '+str(count))
                 node = self.undo_move(move,cap,captured,child)
-                if val <= alpha: #don't update alpha and prune if its greater than beta
-                    print('returning_val_min: '+str(val))
-                    print('not_recursing_min')
-                    return val
-                beta = min(beta,val)
-            print('returning val (min): '+str(val))
-            print('not recursing min')
-            return val
+                if beta <= alpha: #don't update alpha and prune if its greater than beta
+                    #print('returning_val_max: '+str(val))
+                    # print('return alpha')
+                    return alpha
+                #alpha = max(alpha,val)
+            # print('returning val (max): '+str(alpha))
+            #print('not recursing max')
+            return alpha #return maximum of all children
+        else: #minimizing player
+            # print('Min turn '+str(level))
+            moves, cap = self.board.get_moves(node,self.board.not_baxter) #gets moves for current node
+            print(moves)
+            #print(node)
+            #val = beta
+            count = 0
+            for move in moves:
+                print('Next move')
+                count += 1
+                child,captured = self.make_move(move,cap,node)
+                print('child:\n '+str(np.array(child)))
+                #print('recursing_min')
+                #print(self.prune(alpha,beta,child,'max',level-1))
+                beta = min((self.prune(alpha,beta,child,'max',level+1)),beta)
+                self.path.append([self.board.not_baxter,move,beta])
+                #print('value: '+str(val))
+
+                # print('beta: '+str(beta))
+                # print('for Move '+str(count))
+                node = self.undo_move(move,cap,captured,child)
+                if beta <= alpha: #don't update alpha and prune if its greater than beta
+                    #print('returning_val_min: '+str(val))
+                    #print('return alpha')
+                    return beta
+                #beta = min(beta,val)
+            #print('returning val (min): '+str(beta))
+            #print('not recursing min')
+            return beta #return minimum of all children
 
 
 class Board():
@@ -283,37 +297,42 @@ class Board():
                 elif col_ele > 0:
                     self.red_piece_count += 1
 
-    def world_to_grid(self,string):
+    def world_to_grid(self,list):
         '''recieve list[0,63], left to right, top to bottom from top left of board, index refers to grid square (inorder),elements are 'empty','color1',color2,'color1_king',color2_king'''
         '''Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position.'''
         state = [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]
         r = 0
         c = 0
-        list = string.split(' ')
+        if isinstance(list,str):
+            list = list.split(' ')
         #print(list)
         for ele in list:
             #print('element: '+str(ele))
-            if ele == 'purple' or ele == 'black':
-                piece = -1
-            elif ele == 'green' or ele == 'red':
-                piece = 1
+            if isinstance(ele,str):
+                if ele == 'purple' or ele == 'black':
+                    piece = -1
+                elif ele == 'green' or ele == 'red':
+                    piece = 1
+                else:
+                    piece = 0
+                state[r][c] = piece
             else:
-                piece = 0
-            state[r][c] = piece
+                state[r][c] = ele
             #print(state)
             if c == 7:
                 r += 1
                 c = 0
             else:
                 c += 1
-        state = self.flip_board(state)
+        #state = self.flip_board(state)
         if self.baxter_color == None:
-            if state[0][0] == 1: #colors determined here !!
+            if state[-1][-2] == 1: #colors determined here !!
                 self.baxter_color = 'red'
                 self.not_baxter = 'black'
-            elif state[0][0] == -1:
+            elif state[-1][-2] == -1:
                 self.baxter_color = 'black'
                 self.not_baxter = 'red'
+        print(self.baxter_color)
         self.init_state = state
         self.get_piece_count(state)
         print(state)
@@ -362,10 +381,10 @@ class Board():
             capture = []
             step = []
             #set possible steps based on whether a pawn or king and which player
-            if state[r][c] == self.p and self.p == -1:
-                step = [[-1,1],[-1,-1]]
-            elif state[r][c] == self.p and self.p == 1:
-                step = [[1,1],[1,-1]]
+            if state[r][c] == self.p:
+                step = [[self.sgn*1,1],[self.sgn*1,-1]]
+            #elif state[r][c] == self.p and self.p == 1:
+            #    step = [[1,1],[1,-1]]
 
             if state[r][c] == self.p*2:
                 step = [[1,1],[1,-1],[-1,1],[-1,-1]]
@@ -404,14 +423,24 @@ class Board():
         capture = []
         steps = [[1,-1],[1,1]]
         self.step_r = 1
+        self.sgn = 1
         if player.lower() == self.baxter_color: #state is always read from baxter's perspective! wrong:in starting with dark color first since black player goes first
-            #Black is -1
-            self.p = 1
-            self.not_p = -1
-        else:
+            self.sgn = -1
+            if self.baxter_color == 'black': #black is -1
+                self.p = -1 #baxter starts from the bottom
+                self.not_p = 1
+            else:
             #state = flip_board(state)
-            self.p = -1 #Red is +1
-            self.not_p = 1
+                self.p = 1 #Red is +1
+                self.not_p = -1
+        else:
+            if self.not_baxter == 'black': #black is -1
+                self.p = -1 #baxter starts from the bottom
+                self.not_p = 1
+            else:
+            #state = flip_board(state)
+                self.p = 1 #Red is +1
+                self.not_p = -1
         #cycle through grid cells
         for r in range(8):
             for c in range(8):
