@@ -15,6 +15,6 @@
   <!-- Now open hand cameras -->
   <node pkg="baxter_tools" type="camera_control.py" name="camera_l" args="-o left_hand_camera -r 1280x800"/>
   <node pkg="baxter_tools" type="camera_control.py" name="camera_r" args="-o right_hand_camera -r 1280x800"/>
-    
+
 
 </launch>
