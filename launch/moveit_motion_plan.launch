@@ -4,7 +4,7 @@
 
     <include file="$(find baxter_moveit_config)/launch/baxter_grippers.launch"/>
   <!-- pick place action server -->
-    <node name="pickplace_as" pkg="checkers" type="pickplace_as" output="screen" />
+    <!-- <node name="pickplace_as" pkg="checkers" type="pickplace_as" output="screen" /> -->
     <!-- <node name="moveit_motion_plan" pkg="checkers" type="moveit_motion_plan" output="screen" /> -->
 
   <!-- State Machine -->
@@ -15,6 +15,6 @@
   <!-- Now open hand cameras -->
   <node pkg="baxter_tools" type="camera_control.py" name="camera_l" args="-o left_hand_camera -r 1280x800"/>
   <node pkg="baxter_tools" type="camera_control.py" name="camera_r" args="-o right_hand_camera -r 1280x800"/>
-    
+
 
 </launch>

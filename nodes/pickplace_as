@@ -19,7 +19,6 @@ import moveit_commander
 import moveit_msgs.msg
 import baxter_interface
 from baxter_interface import Gripper, CHECK_VERSION
-from tf import quaternion_matrix
 import tf.transformations as tr
 from geometry_msgs.msg import Point, Quaternion, Pose, PoseStamped
 from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
@@ -27,12 +26,6 @@ from checkers.msg import PickPlaceAction, PickPlaceFeedback, PickPlaceResult
 
 class PickPlace():
     def __init__(self):
-        # Setup subcriber for Tcb, board to camera frame transform
-        # Set queue size to 1 to get most recent data
-        self.subTcb = rospy.Subscriber('Tcb',
-                                       Pose,
-                                       self.callback_Tcb,
-                                       queue_size=1)
         # Initialise
         rospy.loginfo("Initializing Baxter with MoveIt...")
         # Enable baxter
@@ -74,10 +67,27 @@ class PickPlace():
         # Movegroup for Left Arm (Camera)
         self.cam_group = moveit_commander.MoveGroupCommander("left_arm")
         self.cam = self.cam_group.get_end_effector_link()
+        # Left arm desired joints
+        # 0.08590292412158317, 1.6256361399615673, -1.666670126037502, -0.08130098175792692, 2.1053886313727306, -0.23700003172829642, -1.339932218217909
+        #- right_e0 - right_e1 - right_s0 - right_s1 - right_w0 - right_w1 - right_w2
+
+        # Setup subcriber for Tcb, board to camera frame transform
+        # Set queue size to 1 to get most recent data
+        self.count = 0
         # Transformation from Board to Camera Frame (update in subscriber)
         self.Tcb = np.zeros((4, 4))
         self.Tcb[2, 2] = 1
         self.Tcb[3, 3] = 1
+        self.pcb = [0, 0]
+
+        self.Tsc = np.zeros((4, 4))
+        self.Tsc[2, 2] = 1
+        self.Tsc[3, 3] = 1
+        self.psc = [0, 0]
+        self.subTcb = rospy.Subscriber('Tcb',
+                                       Pose,
+                                       self.callback_Tcb,
+                                       queue_size=1)
 
         # Planning and Execurtion parameters
         self.move_group.set_goal_position_tolerance(0.001)
@@ -103,7 +113,7 @@ class PickPlace():
         # z is the z position of the objects we want to grasp
         # set to the table z origin plus half the table height
         # self.z_org is the z origin
-        self.z_org = -0.31
+        self.z_org = -0.231  # SMALL TABLE: -0.31
         self.z = self.z_org + 0.05
 
         # Add table as collision object
@@ -139,29 +149,32 @@ class PickPlace():
         self.box_pose.pose.position.z = self.z_org
         self.box_pose.pose.orientation.w = 1.0
         # Length, Width, Height
-        self.scene.add_box(self.box_name, self.box_pose, size=(0.6, 0.8, 0.1))
+        self.scene.add_box(self.box_name, self.box_pose, size=(1, 1.5, 0.1))
         # return self.wait_for_state_update(box_is_known=True, timeout=timeout)
 
     def go_to_joint_state(self,
-                          j0=-0.76,
-                          j1=0.19,
-                          j2=1.23,
-                          j3=1.95,
-                          j4=1.244,
-                          j5=-1.33,
-                          j6=0.56):
+                          j0=-0.96,
+                          j1=0.026,
+                          j2=1.56,
+                          j3=1.86,
+                          j4=1.48,
+                          j5=-1.57,
+                          j6=0.114):
         """ DESCRIPTION:
 
             Args:
 
             Returns:
+
+
+            SMALL TABLE: j0=-0.76, j1=0.19, j2=1.23, j3=1.95, j4=1.244, j5=-1.33, j6=0.56
         """
         # Planning to a Joint Goal
         # Get current pose to set type
         joint_goal = self.move_group.get_current_joint_values()
         # Overwrite current pose with desired pose
         # Default pose is out of board's way
-        # print(joint_goal)
+        print("JOINT GOAL".format(joint_goal))
         joint_goal[0] = j0
         joint_goal[1] = j1
         joint_goal[2] = j2
@@ -174,6 +187,42 @@ class PickPlace():
 
         # Calling ``stop()`` ensures that there is no residual movement
         self.move_group.stop()
+
+    def cam_joint_state(self,
+                        j0=-0.96,
+                        j1=0.026,
+                        j2=1.56,
+                        j3=1.86,
+                        j4=1.48,
+                        j5=-1.57,
+                        j6=0.114):
+        """ DESCRIPTION:
+
+            Args:
+
+            Returns:
+
+
+            SMALL TABLE: j0=-0.76, j1=0.19, j2=1.23, j3=1.95, j4=1.244, j5=-1.33, j6=0.56
+        """
+        # Planning to a Joint Goal
+        # Get current pose to set type
+        joint_goal = self.cam_group.get_current_joint_values()
+        # Overwrite current pose with desired pose
+        # Default pose is out of board's way
+        print("JOINT GOAL".format(joint_goal))
+        joint_goal[0] = j0
+        joint_goal[1] = j1
+        joint_goal[2] = j2
+        joint_goal[3] = j3
+        joint_goal[4] = j4
+        joint_goal[5] = j5
+        joint_goal[6] = j6
+        # Execute Goal
+        self.cam_group.go(joint_goal, wait=True)
+
+        # Calling ``stop()`` ensures that there is no residual movement
+        self.cam_group.stop()
 
     def go_to_pose_goal(self, goal=[0.5, 0.0]):
         """ This function is called to bring the EE to its
@@ -252,12 +301,14 @@ class PickPlace():
         rospy.loginfo("================== Home ==============")
         # Go to pick_place home config
         j0 = 0.09395632325798159
-        j1 = 0.4088058799714628
-        j2 = 1.313087554429914
-        j3 = 1.9941750242510379
-        j4 = 1.0657331523833913
-        j5 = -1.5274613695369008
-        j6 = 1.3652429012180183
+        j1 = 0.31
+        j2 = 1.23
+        j3 = 2.43
+        j4 = 1.08
+        j5 = -1.57
+        j6 = 0.233
+        # SMALL TABLE
+        # j0 = 0.09395632325798159 j1 = 0.4088058799714628 j2 = 1.313087554429914 j3 = 1.9941750242510379 j4 = 1.0657331523833913 j5 = -1.5274613695369008 j6 = 1.3652429012180183
         self.go_to_joint_state(j0, j1, j2, j3, j4, j5, j6)
         # Publish feedback
         feedback.completed_moves.append("home_start")
@@ -498,13 +549,15 @@ class PickPlace():
 
             Returns
         """
-        qt = pose.orientation
-        R = quaternion_matrix(qt)
+        q = pose.orientation
+        qt = [q.x, q.y, q.z, q.w]
+        R = tr.quaternion_matrix(qt)
+        p = [pose.position.x, pose.position.y]
         T = np.array([[R[0][0], R[0][1], R[0][2], pose.position.x],
                       [R[1][0], R[1][1], R[1][2], pose.position.y],
                       [R[2][0], R[2][1], R[2][2], pose.position.z],
                       [0, 0, 0, 1]])
-        return T
+        return T, p
 
     def callback_Tcb(self, pose):
         """ DESCRIPTION:
@@ -513,7 +566,10 @@ class PickPlace():
 
             Returns
         """
-        self.Tcb = self.get_T(pose)
+        # rospy.loginfo(pose)
+        if self.count == 0:
+            self.Tcb, self.pcb = self.get_T(pose)
+            self.count = 1
 
     def execute_cb(self, goal):
         """ DESCRIPTION:
@@ -523,36 +579,64 @@ class PickPlace():
             Returns
         """
         # First, get the Transform from EE (camera) to World
-        Tsc = self.get_T(self.cam_group.get_current_pose().pose)
+        rospy.loginfo("EE CAM POSE")
+        rospy.loginfo(self.cam_group.get_current_pose().pose)
         # Then, from the subscriber update, get the
         # Transform from Board to EE (camera)
-        Tcb = self.Tcb
         # Now get Transform from Board to World
-        Tsb = np.dot(Tsc, Tcb)
+        Tsb = np.matmul(self.Tsc, self.Tcb)
+        rospy.loginfo("TSB:")
+        rospy.loginfo(Tsb)
         # Now get cartesian pose of board wrt world frame
-        psb = np.array([Tsb[0, 3], Tsb[1, 3], Tsb[2, 3]])
+        # psb = np.array([Tsb[0, 3], Tsb[1, 3], Tsb[2, 3]])
+        psb = [self.psc[0] + self.pcb[0], self.psc[1] + self.pcb[1]]
+        rospy.loginfo("PSB:")
+        rospy.loginfo(psb)
         # Now, update goals to be absolute from World to Goal
-        goal.pick_goal[0] += psb[0]
-        goal.pick_goal[1] += psb[1]
-        goal.place_goal[0] += psb[0]
-        goal.place_goal[1] += psb[1]
+        pick_goal = [goal.pick_goal[0], goal.pick_goal[1]]
+        pick_goal[0] += psb[0]
+        pick_goal[1] += psb[1]
+        place_goal = [goal.place_goal[0], goal.place_goal[1]]
+        place_goal[0] += psb[0]
+        place_goal[1] += psb[1]
         # Feedback and Result for Action
         print("Goal Received")
         feedback = PickPlaceFeedback()
         result = PickPlaceResult()
 
+        pick_result = ""
+        place_result = ""
         # Go home if required
         if goal.home is True:
             self.go_to_joint_state()
-            pick_result = ""
-            place_result = ""
+            result.status = "home"
+        # Perform Calibration if required
+        elif goal.calibrate is True:
+            self.Tsc, self.psc = self.get_T(
+                self.cam_group.get_current_pose().pose)
+            result.status = "calibrated"
+        # Move Camera to View Position
+        elif goal.camera_view is True:
+            j0 = 0.093
+            j1 = 0.31
+            j2 = 1.23
+            j3 = 2.43
+            j4 = 1.08
+            j5 = -1.57
+            j6 = 0.233
+            self.cam_joint_state(j0, j1, j2, j3, j4, j5, j6)
+            result.status = "view"
+        # Move Camera to Home Position
+        elif goal.camera_home is True:
+            self.cam_joint_state()
+            result.status = "camera_home"
+        # Perform Pick Place
         else:
-
             # Execute Pick Routine
-            pick_result = self.pick_cartesian(goal.pick_goal, feedback)
+            pick_result = self.pick_cartesian(pick_goal, feedback)
 
             # Execute Place Routine
-            place_result = self.place_cartesian(goal.place_goal, feedback)
+            place_result = self.place_cartesian(place_goal, feedback)
 
             # Return result
             if pick_result == "compromised" or place_result == "compromised":

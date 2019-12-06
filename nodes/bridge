@@ -2,6 +2,7 @@
 
 import rospy
 from sensor_msgs.msg import Image
+from std_msgs.msg import String
 from geometry_msgs.msg import Pose
 import cv2
 import cv_bridge
@@ -17,7 +18,8 @@ class Vision():
                                     self.image_callback, queue_size=1)
         # Publish pose to Tcb topic
         self.pub = rospy.Publisher('Tcb', Pose, queue_size=1)
-        self.countt = 0
+        self.pub2 = rospy.Publisher('Board_State', String, queue_size=1)
+        self.single_picture_count = 0
 
     def rotate_matrix(self, mtx):
         # Outputs a new 64x1 vector but rotated by 90 degrees clockwise as if it
@@ -36,28 +38,33 @@ class Vision():
         frame = self.bridge.imgmsg_to_cv2(ros_img,
                                              desired_encoding="passthrough")
 
+        # Output new board state in order from top left to bottom right outputing
+        #   a list of strings with either "empty" or piece_color or piece_color_king.
+        board_state2 = []
+        for i in range(64):
+            board_state2.append('empty')
+
+
+        axis = np.float32([[1,0,0], [0,1,0], [0,0,-1]]).reshape(-1,3)
 
         def draw_origin(img, corners, imgpts):
-        #    corners3 = []
+        #  Need to move up
 
             corner = tuple(corners[0].ravel())
             img = cv2.line(img, corner, tuple(imgpts[0].ravel()), (255,0,0), 5)
             img = cv2.line(img, corner, tuple(imgpts[1].ravel()), (0,255,0), 5)
-            img = cv2.line(img, corner, tuple(imgpts[5].ravel()), (0,0,255), 5)
+            img = cv2.line(img, corner, tuple(imgpts[2].ravel()), (0,0,255), 5)
             return img
 
-        print("size")
         dimensionss = frame.shape
         print(dimensionss)
 
-
-        if self.countt < 1:
+        # Use to take a picture for calibration.
+        if self.single_picture_count < 1:
             cv2.imwrite('/home/jmzeeb/Embedded_Systems/opencv/baxtest2.jpg', frame)
-            self.countt =+ 1
-        # square width 43.5mm
-        # square width 55.9mm
-        SW = .0559
-        # termination criteria
+            self.single_picture_count =+ 1
+
+
         # Red
         lower_range_red = np.array([0,173,156])
         upper_range_red = np.array([180,255,255])
@@ -68,9 +75,10 @@ class Vision():
         lower_range_blue = np.array([25,49,98])
         upper_range_blue = np.array([56,255,255])
         #light purple
-        lower_range_red = np.array([105,39,38])
+        lower_range_red = np.array([118,30,39])
         upper_range_red = np.array([180,255,255])
 
+        # Termination criteria
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
         # Values found from camera_calibration.py
@@ -81,15 +89,18 @@ class Vision():
         h = 800
         w = 1280
 
-        # Incase of
-        ##newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
 
+        # Object points to create board cordinates
         objp = np.zeros((7*7,3), np.float32)
         objp[:,:2] = np.mgrid[0:7,0:7].T.reshape(-1,2)
 
         axis = np.float32([[3,0,0], [0,3,0], [0,0,-3]]).reshape(-1,3)
 
-        # Dictionary to convert index to board position
+        # square width 43.5mm
+        # square width 55.9mm
+        SW = .0559
+        """
+        # Dictionary to convert index to board position from bottom left outer corner
         board_dict = {0 : [SW*0.5,SW*7.5], 1 : [SW*1.5,SW*7.5], 2 : [SW*2.5,SW*7.5], 3 : [SW*3.5,SW*7.5], 4 : [SW*4.5,SW*7.5], 5 : [SW*5.5,SW*7.5], 6 : [SW*6.5,SW*7.5], 7 : [SW*7.5,SW*7.5],
                       8 : [SW*0.5,SW*6.5], 9 : [SW*1.5,SW*6.5], 10: [SW*2.5,SW*6.5], 11: [SW*3.5,SW*6.5], 12: [SW*4.5,SW*6.5], 13: [SW*5.5,SW*6.5], 14: [SW*6.5,SW*6.5], 15: [SW*7.5,SW*6.5],
                       16: [SW*0.5,SW*5.5], 17: [SW*1.5,SW*5.5], 18: [SW*2.5,SW*5.5], 19: [SW*3.5,SW*5.5], 20: [SW*4.5,SW*5.5], 21: [SW*5.5,SW*5.5], 22: [SW*6.5,SW*5.5], 23: [SW*7.5,SW*5.5],
@@ -98,6 +109,18 @@ class Vision():
                       40: [SW*0.5,SW*2.5], 41: [SW*1.5,SW*2.5], 42: [SW*2.5,SW*2.5], 43: [SW*3.5,SW*2.5], 44: [SW*4.5,SW*2.5], 45: [SW*5.5,SW*2.5], 46: [SW*6.5,SW*2.5], 47: [SW*7.5,SW*2.5],
                       48: [SW*0.5,SW*1.5], 49: [SW*1.5,SW*1.5], 50: [SW*2.5,SW*1.5], 51: [SW*3.5,SW*1.5], 52: [SW*4.5,SW*1.5], 53: [SW*5.5,SW*1.5], 54: [SW*6.5,SW*1.5], 55: [SW*7.5,SW*1.5],
                       56: [SW*0.5,SW*0.5], 57: [SW*1.5,SW*0.5], 58: [SW*2.5,SW*0.5], 59: [SW*3.5,SW*0.5], 60: [SW*4.5,SW*0.5], 61: [SW*5.5,SW*0.5], 62: [SW*6.5,SW*0.5], 63: [SW*7.5,SW*0.5]}
+        """
+
+        # Dictionary to convert index to board position from top left inner corner
+        board_dict = {0 : [SW*-0.5,SW*-0.5], 1 : [SW*0.5,SW*-0.5], 2 : [SW*1.5,SW*-0.5], 3 : [SW*2.5,SW*-0.5], 4 : [SW*3.5,SW*-0.5], 5 : [SW*4.5,SW*-0.5], 6 : [SW*5.5,SW*-0.5], 7 : [SW*6.5,SW*-0.5],
+                      8 : [SW*-0.5,SW*0.5], 9 : [SW*0.5,SW*0.5], 10: [SW*1.5,SW*0.5], 11: [SW*2.5,SW*0.5], 12: [SW*3.5,SW*0.5], 13: [SW*4.5,SW*0.5], 14: [SW*5.5,SW*0.5], 15: [SW*6.5,SW*0.5],
+                      16: [SW*-0.5,SW*1.5], 17: [SW*0.5,SW*1.5], 18: [SW*1.5,SW*1.5], 19: [SW*2.5,SW*1.5], 20: [SW*3.5,SW*1.5], 21: [SW*4.5,SW*1.5], 22: [SW*5.5,SW*1.5], 23: [SW*6.5,SW*1.5],
+                      24: [SW*-0.5,SW*2.5], 25: [SW*0.5,SW*2.5], 26: [SW*1.5,SW*2.5], 27: [SW*2.5,SW*2.5], 28: [SW*3.5,SW*2.5], 29: [SW*4.5,SW*2.5], 30: [SW*5.5,SW*2.5], 31: [SW*6.5,SW*2.5],
+                      32: [SW*-0.5,SW*3.5], 33: [SW*0.5,SW*3.5], 34: [SW*1.5,SW*3.5], 35: [SW*2.5,SW*3.5], 36: [SW*3.5,SW*3.5], 37: [SW*4.5,SW*3.5], 38: [SW*5.5,SW*3.5], 39: [SW*6.5,SW*3.5],
+                      40: [SW*-0.5,SW*4.5], 41: [SW*0.5,SW*4.5], 42: [SW*1.5,SW*4.5], 43: [SW*2.5,SW*4.5], 44: [SW*3.5,SW*4.5], 45: [SW*4.5,SW*4.5], 46: [SW*5.5,SW*4.5], 47: [SW*6.5,SW*4.5],
+                      48: [SW*-0.5,SW*5.5], 49: [SW*0.5,SW*5.5], 50: [SW*1.5,SW*5.5], 51: [SW*2.5,SW*5.5], 52: [SW*3.5,SW*5.5], 53: [SW*4.5,SW*5.5], 54: [SW*5.5,SW*5.5], 55: [SW*6.5,SW*5.5],
+                      56: [SW*-0.5,SW*6.5], 57: [SW*0.5,SW*6.5], 58: [SW*1.5,SW*6.5], 59: [SW*2.5,SW*6.5], 60: [SW*3.5,SW*6.5], 61: [SW*4.5,SW*6.5], 62: [SW*5.5,SW*6.5], 63: [SW*6.5,SW*6.5]}
+
         # Made top left inside corner the origin based on cv2.findChessboardCorners().
         # All spaces are listed going left to right and top to bottom.  (A8 first, H1 last)
         board_pts = np.float32([[-0.5,-0.5,0],[.5,-0.5,0],[1.5,-0.5,0],[2.5,-0.5,0],[3.5,-0.5,0],[4.5,-0.5,0],[5.5,-0.5,0],[6.5,-0.5,0],
@@ -142,6 +165,7 @@ class Vision():
                 Rt[0:2, 0:2] = R[0:2, 0:2]
                 Rt[3,3] = 1
                 quat = tf.transformations.quaternion_from_matrix(Rt)
+
                 # Populate Tranformation Matrix
                 Tcb = Pose()
                 Tcb.orientation.x = quat[0]
@@ -152,8 +176,13 @@ class Vision():
                 Tcb.position.y = SW*tvecs[1][0]
                 Tcb.position.z = SW*tvecs[2][0]
                 print(Tcb)
+
                 # Now Publish Transformation Matrix
                 self.pub.publish(Tcb)
+
+                # Test cord point
+                #test_pt, _ = cv2.projectPoints(np.array([2,1]),rvecs,tvecs,mtx,dist)
+                #cv2.circle(frame, test_pt, 5, (0, 0, 255),-1)
 
             if corners3[0][0] > corners3[-1][0] and corners3[0][1] < corners3[-1][1]:
                 board_pts = board_pts_2
@@ -167,10 +196,10 @@ class Vision():
 
             test_imgpts = np.float32([[250,250]]).reshape(-1,2)
 
-
+            # Project board and axis points from board cord to image cord
             board_imgpts, jac2 = cv2.projectPoints(board_pts,rvecs,tvecs,mtx,dist)
+            axis_imgpts, jac = cv2.projectPoints(axis,rvecs,tvecs,mtx,dist)
 
-            #frame = draw_origin(frame,corners2,board_imgpts)
             prev_board_imgpts = board_imgpts
             #print('board')
             #print(board_imgpts)
@@ -228,12 +257,13 @@ class Vision():
                     cv2.circle(frame, (cX, cY), 5, (0, 255, 255),-1)
                     circle_count_red += 1
                     checkers_impgpts_red.append([cX,cY,'red'])
-            """
-            print ('red count')
-            print circle_count_red
-            print ('red imgpts')
-            print checkers_impgpts_red
-            """
+
+            ##print ('red count')
+            ##print circle_count_red
+            ##print('\n')
+            #print ('red imgpts')
+            #print checkers_impgpts_red
+
         ########################################################################
 
             # Find blue blobs
@@ -263,13 +293,16 @@ class Vision():
                     circle_count_blue += 1
                     checkers_impgpts_blue.append([cX,cY,'blue'])
 
-            """
-            print ('blue count')
-            print circle_count_blue
-            print ('blue imgpts')
-            print checkers_impgpts_blue
-            """
+
+            ##print ('blue count')
+            ##print circle_count_blue
+            ##print('\n')
+            ##print ('blue imgpts')
+            ##print checkers_impgpts_blue
+
         ####################################################################
+
+
 
             # Calculate distance to available board squares
             min_distance_list_blue = []
@@ -287,7 +320,9 @@ class Vision():
                         print board_dict[index[0][0]]
                         """
                         if not [board_dict[index[0][0]], 'blue'] in board_state:
+                            # Output index of board position to board state lists
                             board_state.append([board_dict[index[0][0]], 'blue'])
+                            board_state2[index[0][0]] = 'green'
                         break
                 min_distance_list_blue.append(min(distance_list))
             """
@@ -310,16 +345,39 @@ class Vision():
                         print board_dict[index[0][0]]
                         """
                         if not [board_dict[index[0][0]], 'red'] in board_state:
+                            # Output index of board position to board state lists
                             board_state.append([board_dict[index[0][0]], 'red'])
+                            board_state2[index[0][0]] = 'purple'
                         break
                 min_distance_list_red.append(min(distance_list))
             """
             print "minimum distance red"
             print min_distance_list_red
             """
-        print ('board state')
-        print board_state
+
+            # Draw the origin
+            frame = draw_origin(frame,corners2,axis_imgpts)
+            """
+                else:
+                    for point in prev_board_imgpts:
+                        point = (point[0][0], point[0][1])
+                        frame = cv2.circle(frame, point, 2, (0,0,255),2)
+            """
+        ##print ('board state')
+        ##print board_state
         print ("\n")
+
+        print ('board state2')
+        print board_state2
+        print ("\n")
+
+        board_state3 = ''
+        for i in range(64):
+            board_state3 = board_state3 + ' ' + board_state2[i]
+        print('boardstate3')
+        print(board_state3)
+        self.pub2.publish(board_state3)
+
         cv2.imshow('frame', frame)
         cv2.waitKey(1)
 

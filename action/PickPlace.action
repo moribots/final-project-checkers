@@ -4,6 +4,9 @@
 float32[] pick_goal
 float32[] place_goal
 bool home
+bool calibrate
+bool camera_view
+bool camera_home
 
 ---
 # Result

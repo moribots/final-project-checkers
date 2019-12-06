@@ -40,18 +40,56 @@ class Client():
 class SETUP(smach.State):
     # Pass Client Object in State init
     def __init__(self, client):
-        smach.State.__init__(self,
-                             outcomes=['initialised'])
+        smach.State.__init__(self, outcomes=['initialised'])
         # Initialise client
         self.client = client
 
+    def setup_goal(self,
+                   pick_goal=[0, 0],
+                   place_goal=[0, 0],
+                   home=False,
+                   calibrate=False,
+                   camera_view=False,
+                   camera_home=False):
+        """ DESCRIPTION
+
+            Args:
+
+            Returns:
+        """
+        self.client.pp_goal.home = home
+        self.client.pp_goal.pick_goal = pick_goal
+        self.client.pp_goal.place_goal = place_goal
+        self.client.pp_goal.calibrate = calibrate
+        self.client.pp_goal.camera_view = camera_view
+        self.client.pp_goal.camera_home = camera_home
+        self.client.pp_client.send_goal(self.client.pp_goal)
+        self.client.pp_client.wait_for_result()
+        if home is True:
+            rospy.loginfo("Returned to Home Position")
+
+        elif calibrate is True:
+            rospy.loginfo("Calibrated")
+
+        elif camera_view is True:
+            rospy.loginfo("Camera at View Position")
+
+        elif camera_home is True:
+            rospy.loginfo("Camera at Home Position")
+
     def execute(self, userdata):
         rospy.loginfo('Initialising...')
-        # Call Camera Calibration AS
-        # userdata.client.cc_client.send  goal
-
-        # Call EE-Board Transform AS
-        # userdata.client.ee_client.send goal
+        # Call Camera Calibration
+        # Make sure pp arm at home
+        self.setup_goal(home=True)
+        # Put camera at view
+        self.setup_goal(camera_view=True)
+        # Input in case user wants to perform manual calibration
+        rospy.loginfo("Hit enter when the camera arm is at the desired pose")
+        raw_input()
+        self.setup_goal(calibrate=True)
+        # Return camera home
+        self.setup_goal(camera_home=True)
 
         # Display on screen: please set up the board and
         # hit enter when ready
@@ -64,18 +102,18 @@ class SETUP(smach.State):
 class PICKCOLOR(smach.State):
     # Pass Client Object in State init
     def __init__(self, client):
-        smach.State.__init__(self,
-                             outcomes=['red', 'black'])
+        smach.State.__init__(self, outcomes=['red', 'black'])
         # Initialise client
         self.client = client
 
     def execute(self, userdata):
-        rospy.loginfo('Determining who goes first...')
+        rospy.loginfo('Pick a color')
         # Call AS to determine if baxter is red or black
         # userdata.client.pc_client.send goal
         # userdata.client.pc_client.wait_for_result()
         # result = userdata.client.pc_client.get_result()
-        if True is True:
+        color = raw_input()
+        if color == 'b':
             return 'black'
         else:
             return 'red'
@@ -134,24 +172,39 @@ class MOVE(smach.State):
         # Initialise client
         self.client = client
 
-    def pp_goal(self, pick_goal=[0, 0], place_goal=[0, 0], home=True):
+    def pp_goal(self,
+                pick_goal=[0, 0],
+                place_goal=[0, 0],
+                home=False,
+                calibrate=False,
+                camera_view=False,
+                camera_home=False):
         """ DESCRIPTION
 
             Args:
 
             Returns:
         """
-        if home is True:
-            self.client.pp_goal.home = home
+        self.client.pp_goal.pick_goal = pick_goal
+        self.client.pp_goal.place_goal = place_goal
+        self.client.pp_goal.home = home
+        self.client.pp_goal.calibrate = calibrate
+        self.client.pp_goal.camera_view = camera_view
+        self.client.pp_goal.camera_home = camera_home
+
+        if home is True or calibrate is True or camera_view is True or camera_home is True:
             self.client.pp_client.send_goal(self.client.pp_goal)
             self.client.pp_client.wait_for_result()
-            rospy.loginfo("Returned to Home Position")
+            if home is True:
+                rospy.loginfo("Returned to Home Position")
+            elif calibrate is True:
+                rospy.loginfo("Calibrated")
+            elif camera_view is True:
+                rospy.loginfo("Camera at View Position")
+            elif camera_home is True:
+                rospy.loginfo("Camera at Home Position")
 
         else:
-            self.client.pp_goal.pick_goal = pick_goal
-            self.client.pp_goal.place_goal = place_goal
-            # Set home to false to make sure pick place executes
-            self.client.pp_goal.home = home
             self.client.pp_client.send_goal(
                 self.client.pp_goal, feedback_cb=self.client.feedback_pp)
             self.client.pp_client.wait_for_result()
@@ -164,23 +217,28 @@ class MOVE(smach.State):
         # userdata.client.move_client.wait_for_result()
         # result = userdata.client.move_client.get_result()
 
+        # Call AS to put camera at home position
+        self.pp_goal(camera_home=True)
+
         # Call AS to perform pick-place per move
         # FOR EACH BAXTER MOVE
-        pick_goal = [0.6, 0.0]
-        place_goal = [0.5, 0.0]
+        pick_goal = [0, 0]  # [0.5 * 0.0559, -0.5 * 0.0559]
+        place_goal = [0, 0]
         home = False
         self.pp_goal(pick_goal, place_goal, home)
 
         # Call AS to perform pick-place per discard
         # FOR EACH BAXTER DISCARD
-        pick_goal = [0.6, 0.0]
-        place_goal = [0.5, 0.0]
+        pick_goal = [0, 0]
+        place_goal = [0, 0]
         home = False
         self.pp_goal(pick_goal, place_goal, home)
 
         # Call AS to go home to clear board for camera
-        # Defaults to go home
-        self.pp_goal()
+        self.pp_goal(home=True)
+
+        # Call AS to put camera at view position
+        self.pp_goal(camera_view=True)
 
         # Call logic function to determine win/lose
         end_game = False
@@ -266,9 +324,7 @@ def main():
                                    'move': 'MOVE',
                                    'exit': 'SHUTDOWN'
                                },
-                               remapping={
-                                   'board_state': 'board_state'
-                               })
+                               remapping={'board_state': 'board_state'})
         # Move State
         smach.StateMachine.add('MOVE',
                                MOVE(client),
@@ -276,9 +332,7 @@ def main():
                                    'wait': 'WAIT',
                                    'exit': 'SHUTDOWN'
                                },
-                               remapping={
-                                   'board_state': 'board_state'
-                               })
+                               remapping={'board_state': 'board_state'})
         # Shutdown State
         smach.StateMachine.add('SHUTDOWN',
                                SHUTDOWN(),
