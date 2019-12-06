@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 class CheckersAI():
     '''Keeps track of game progress and uses Minimax with alpha beta pruning to find best move for the Baxter robot'''
     def __init__(self):
@@ -34,9 +35,11 @@ class CheckersAI():
                 captured: returns position of any captured pieces'''
         valid = False
         captured = []
-        state = self.board.world_to_grid(state)
+       # state = self.board.world_to_grid(state)
         self.board.get_piece_count(state)
         moves, cap = self.board.get_moves(state,color)#self.board.baxter_color)
+        print(np.array(state))
+
         print('Legal Moves in python indicies so add 1 to each value: '+str(moves))
         #print(moves[0][0])
         while not valid:
@@ -126,7 +129,7 @@ class CheckersAI():
     def make_move(self,move,cap,state):
         '''make a array of board states (nodes) after all legal moves starting from current state. include whether or not the node is terminal'''
         if len(state) > 8:
-            print('world_to_grid')
+            #print('world_to_grid')
             state = self.board.world_to_grid(state)
         print('moves: '+str(move))
         print('captures: '+str(cap))
@@ -215,10 +218,11 @@ class CheckersAI():
             #val = alpha
             count = 0
             print(moves)
+            init_state = copy.deepcopy(node)
             for move in moves:
                 print('next move')
                 count += 1
-                child,captured = self.make_move(move,cap,node)
+                child,captured = self.make_move(move,cap,init_state)
                 print('child:\n '+str(np.array(child)))
                 #print('recursing_max')
                 #print((self.prune(alpha,beta,child,'min',level-1)))
@@ -227,7 +231,7 @@ class CheckersAI():
                 #print('value: '+str(val))
                 # print('alpha: '+str(alpha))
                 # print('for Move '+str(count))
-                node = self.undo_move(move,cap,captured,child)
+                #node = self.undo_move(move,cap,captured,child)
                 if beta <= alpha: #don't update alpha and prune if its greater than beta
                     #print('returning_val_max: '+str(val))
                     # print('return alpha')
@@ -242,11 +246,12 @@ class CheckersAI():
             print(moves)
             #print(node)
             #val = beta
+            init_state = copy.deepcopy(node)
             count = 0
             for move in moves:
                 print('Next move')
                 count += 1
-                child,captured = self.make_move(move,cap,node)
+                child,captured = self.make_move(move,cap,init_state)
                 print('child:\n '+str(np.array(child)))
                 #print('recursing_min')
                 #print(self.prune(alpha,beta,child,'max',level-1))
@@ -332,10 +337,10 @@ class Board():
             elif state[-1][-2] == -1:
                 self.baxter_color = 'black'
                 self.not_baxter = 'red'
-        print(self.baxter_color)
+        #print(self.baxter_color)
         self.init_state = state
         self.get_piece_count(state)
-        print(state)
+        #print(state)
         return state
 
 
@@ -411,6 +416,8 @@ class Board():
                                 if cap_success:
                                     moves[0][1] = temp[1] #replace previously saved end position with end position after double jump
                                     capture.append([parent,dcap[1]])
+
+                            return moves, capture
 
             return moves, capture
 
