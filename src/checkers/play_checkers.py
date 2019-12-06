@@ -397,17 +397,19 @@ class Board():
             for s in step: #take a step in valid directions
                 stepc = s[1]
                 stepr = s[0]
+                # print(moves)
                 if c+stepc >= 0 and c+stepc <= 7 and r+stepr >= 0 and r+stepr <= 7: # Checks that the step won't take piece out of bounds
                     '''Single Step'''
                     if state[r+stepr][c+stepc] == 0: #if the diagonal square is empty, add step to list of legal moves
                         moves.append([[r,c],[r+stepr,c+stepc]])
+                        # print(True)
                     else: #If not empty, try to make a jump
+                        # print('jump')
                         move, cap, cap_success = can_jump(r,c,stepr,stepc,state) #single jump
-                        moves = [move]
-                        if len(cap) != 0:
-                            capture = [cap] #store captured piece position if successful jump
                         '''Double jump'''
                         if cap_success: #check for double jump
+                            capture = [cap] #store captured piece position if successful jump
+                            moves = [move]
                             for s2 in step: #check all possible step directions
                                 stepc2 = s2[1]
                                 stepr2 = s2[0]
@@ -425,6 +427,7 @@ class Board():
 
         #currently assuming list
         self.get_piece_count(state)
+        # print(self.red_piece_count)
         moves = []
         temp = []
         capture = []
@@ -451,9 +454,11 @@ class Board():
         #cycle through grid cells
         for r in range(8):
             for c in range(8):
+                # print(r,c)
                 mK,capK = can_step(r,c,state)
+
                 temp_moves = []
-                #print(mK)
+                # print(mK)
                 for i in range(len(mK)):
                     if len(mK[i]) != 0:
                         temp_moves.append(mK[i])
