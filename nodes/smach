@@ -289,7 +289,7 @@ class MYTURN(smach.State):
         str_count = 0
         while str_count < 2:
             self.count = 0
-            rospy.sleep(0.5)
+            rospy.sleep(0.1)
             list_from_cam = self.client.board_state
             str_check = list_from_cam.split(" ")
             for item in str_check:
