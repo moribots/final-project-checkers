@@ -6,18 +6,18 @@ import numpy as np
 
 if __name__ == '__main__':
     rospy.init_node('get_baxter_move')
-    print('RULES: Grid squares start counting from Baxter\'s left corner (Ex. 3,3 = third column and third row from Baxter\'s left corner)\nDark player gose first. \
-If you double jump, put only the start position and the goal position after the double jump. \n')
+#     print('RULES: Grid squares start counting from Baxter\'s left corner (Ex. 3,3 = third column and third row from Baxter\'s left corner)\nDark player gose first. \
+# If you double jump, put only the start position and the goal position after the double jump. \n')
+
     #  state list will come from CV
     top_to_bottom = 'empty purple empty purple empty purple empty purple purple empty purple empty purple empty purple empty empty purple empty purple empty purple empty purple \
 empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty \
 green empty green empty green empty green empty empty green empty green empty green empty green \
 green empty green empty green empty green empty' #<== baxters side
-    bottom_to_top = top_to_bottom[::-1]
-    #print(bottom_to_top)
-    '''state = [[-1, 0,-1, 0,-1, 0,-1, 0],
-             [ 0,-1, 0,-1, 0,-1 ,0,-1],
-             [0, 0,-1, 0,-1, 0,-1, 0],
+
+    '''state = [[ 0, 0, 0, 0, 0, 0, 0, 0],
+             [ 0, 0, 0, 0, 0,-1 ,0, 0],
+             [ 0, 0, 0, 0, 0, 0, 0, 0],
              [ 0, 1, 0, 0, 0, 0, 0, 0],
              [ 0, 0, 0, 0, 0, 0, 0, 0],
              [ 0, 1, 0, 0, 0, 0, 0, 0],
@@ -31,30 +31,34 @@ green empty green empty green empty green empty' #<== baxters side
               0, 0, 0, 0, 0, 0, 0, 0,
               0, 0, 0, 0, 0, 0, 0, 0,
               0, 0, 0, 0, 0, 0, 0, 0]'''
-    state = 'empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty green empty empty empty empty empty empty\
-    empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty green empty'
-
+    # state = 'empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty green empty empty empty empty empty empty\
+    # empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty green empty'
+    #
     ai = CheckersAI() #Initialize AI object
-    # best_move = ai.minimax(state)
+    # ai.board.baxter_color = 'red'
+    # ai.board.not_baxter = 'black'
+    # best_move_list = ai.minimax(top_to_bottom)
     s  = 1
+
+
     #player = raw_input('Enter Baxter\'s color(Black or Red):') #in future batxer will know based on how the board is set up
-    # player  = ai.whos_turn #black goes first
-    next_state = ai.board.world_to_grid(top_to_bottom)
-    while s != None:
-        s,g,c = ai.give_command(next_state,ai.whos_turn)
-        #print(s,g,c)
-        player = ai.switch_turn()
-        print('Start: [%i,%i], Goal: [%i,%i]'%(s[0]+1,s[1]+1,g[0]+1,g[1]+1))
-        #for i in range(len(c)):
-        #    for j in range(len(c[i])):
-        #        c[i][j] += 1
-        print('Captured: '+str(c))
-        after_move = ai.make_move([s,g],c,next_state)
-        next_state = after_move[0]
-        print(after_move)
-        #ai.is_game_over(after_move[0])
-        movelist = ai.grid_to_world([s,g],c)
-        if ai.game_over:
-            print('Game over')
-            print(ai.winner+' is the winner!')
-            break
+    #player  = ai.whos_turn #black goes first
+    #next_state = ai.board.world_to_grid(top_to_bottom)
+    #while s != None:
+    movelist = ai.give_command(top_to_bottom)
+    #print(s,g,c)
+    #player = ai.switch_turn()
+    # print('Start: [%i,%i], Goal: [%i,%i]'%(s[0]+1,s[1]+1,g[0]+1,g[1]+1))
+    #for i in range(len(c)):
+    #    for j in range(len(c[i])):
+    #        c[i][j] += 1
+    # print('Captured: '+str(c))
+    # after_move = ai.make_move([s,g],c,next_state)
+    # next_state = after_moave[0]
+    # print(after_move)
+    #ai.is_game_over(after_move[0])
+    #movelist = ai.grid_to_world([s,g],c)
+    # if ai.game_over:
+    #     print('Game over')
+    #     print(ai.winner+' is the winner!')
+    #     break

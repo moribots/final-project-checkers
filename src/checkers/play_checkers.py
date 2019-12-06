@@ -25,23 +25,22 @@ class CheckersAI():
                  [ 0, 1, 0, 1, 0, 1, 0, 1]]
         self.board = Board()
 
-    def give_command(self,state,color):
+    def give_command(self,state_list):#,color(used for testing)):
         '''ARGS:
-                board: Board object that stores the positions of the pieces on the board, used to check if the move is legal
-                color: designates what color the player is, used for get_moves (only used in testing)
+                state_list:string that stores the positions of the pieces on the board, output from CV node
            Returns:
-                start: Grid position of the piece to move
-                goal: Grid position of where to move the piece to
-                captured: returns position of any captured pieces'''
+                movelist: returns list of indicies for the pieces to move [start, goal, captured1,captured2,...]
+        Takes state_list (string) converts it to integer board array. Deteremies baxter's color. Uses state array and
+        baxter's color to get the legal moves. Waits for user to input a start and end goal then checks if this is a legal move.
+        if it is a legal move, takes that move and any captured piece positions and converts to world posiiton index, which it returns.'''
         valid = False
         captured = []
-       # state = self.board.world_to_grid(state)
+        state = self.board.world_to_grid(state_list)
         self.board.get_piece_count(state)
-        moves, cap = self.board.get_moves(state,color)#self.board.baxter_color)
+        color = self.board.baxter_color
+        moves, cap,p = self.board.get_moves(state,color)#self.board.baxter_color)
         print(np.array(state))
-
         print('Legal Moves in python indicies so add 1 to each value: '+str(moves))
-        #print(moves[0][0])
         while not valid:
             start_in = raw_input('Enter position of piece you want to move or q to quit: ')
             if start_in == 'q':
@@ -67,7 +66,11 @@ class CheckersAI():
                             captured.append(c)
             if not valid:
                 print('\nEntered an illegal move, please enter a different move.\n')
-        return start, goal, captured
+        print('Start: [%i,%i], Goal: [%i,%i]'%(start[0]+1,start[1]+1,goal[0]+1,goal[1]+1))
+        print('Captured: '+str(captured))
+        after_move = self.make_move([start,goal],captured,state,p)
+        print(np.array(after_move[0]))
+        return self.grid_to_world([start, goal], captured)
 
     def switch_turn(self):
         '''Sets variable for which players turn it is to the other player'''
@@ -162,10 +165,10 @@ class CheckersAI():
         # print(np.array(state))
         return state
 
-    def minimax(self,state):#_list):
+    def minimax(self,state_list):
         '''Minimax algorithm to get best moves for baxter
             ARGS: max: (bool) is maximizing player?'''
-        #state = self.board.world_to_grid(state_list)
+        state = self.board.world_to_grid(state_list)
         best_move = []
         moves,cap,p = self.board.get_moves(state,self.board.baxter_color)
         if len(moves) == 1: return self.grid_to_world(moves,cap) #captured moves are forced
@@ -202,7 +205,7 @@ class CheckersAI():
         self.is_game_over(node)
         #print('black: '+str(self.board.black_piece_count))
         #print('red: '+str(self.board.red_piece_count))
-        if self.game_over or level > 20: #return utility of the node if terminal node
+        if self.game_over or level > 50: #return utility of the node if terminal node
             if self.game_over == False:
                 if is_max:
                     if self.board.baxter_color == 'black':
@@ -244,8 +247,9 @@ class CheckersAI():
                 print('Max next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
                 child,captured = self.make_move(move,cap,init_state,p)
                 # print('child:\n '+str(np.array(child)))
-                #print((self.prune(alpha,beta,child,'min',level-1)))
-                alpha = max(alpha,(self.prune(alpha,beta,child,'min',level+1)))
+                evaluate = self.prune(alpha,beta,child,'min',level-1)
+                print('Utility of child node: '+str(evaluate))
+                alpha = max(alpha,evaluate)
                 self.path.append([self.board.baxter_color,move,alpha])
                 #print('value: '+str(val))
                 # print('alpha: '+str(alpha))
@@ -260,7 +264,7 @@ class CheckersAI():
                     return alpha
                 #alpha = max(alpha,val)
                 print('returning val (max): '+str(alpha))
-                return alpha #return maximum of all children
+            return alpha #return maximum of all children
 
         else: #minimizing player
             moves, cap,p = self.board.get_moves(node,self.board.not_baxter) #gets moves for current node
@@ -273,8 +277,9 @@ class CheckersAI():
                 print('Min next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
                 child,captured = self.make_move(move,cap,init_state,p)
                 # print('child:\n '+str(np.array(child)))
-                #print(self.prune(alpha,beta,child,'max',level-1))
-                beta = min((self.prune(alpha,beta,child,'max',level+1)),beta)
+                evaluate = self.prune(alpha,beta,child,'max',level+1)
+                print('Utility of child node: '+str(evaluate))
+                beta = min(evaluate,beta)
                 #self.path.append([self.board.not_baxter,move,beta])
                 # print('beta: '+str(beta))
                 # print('for Move '+str(count))
@@ -288,7 +293,7 @@ class CheckersAI():
                     return beta
                 #beta = min(beta,val)
                 print('returning val (min): '+str(beta))
-                return beta #return minimum of all children
+            return beta #return minimum of all children
 
 
 class Board():
@@ -322,10 +327,10 @@ class Board():
             for col_ele in row:
                 if col_ele < 0:
                     self.black_piece_count += 1
-                    if col_ele == -2: black_king_count += 1
+                    if col_ele == -2: black_king_count += 2
                 elif col_ele > 0:
                     self.red_piece_count += 1
-                    if col_ele == 2: red_king_count += 1
+                    if col_ele == 2: red_king_count += 2
         self.red_total = self.red_piece_count + red_king_count
         self.black_total = self.black_piece_count + black_king_count
 
