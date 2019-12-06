@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """
-REFERENCE: https://github.com/ros-planning/moveit_tutorials/blob/master/doc/move_group_python_interface/scripts/move_group_python_interface_tutorial.py
-
-DESCRIPTION: The Pick Place Action Server
+DESCRIPTION:
 
 
 SUBSCRIBERS:
@@ -16,10 +14,15 @@ import smach_ros
 import actionlib
 from checkers.msg import PickPlaceAction, PickPlaceGoal
 import baxter_interface
+from checkers.play_checkers import CheckersAI
+from std_msgs.msg import String
+from baxter_interface import Gripper, CHECK_VERSION
 
 
 class Client():
     def __init__(self):
+        # Initialise CheckersAI Class
+        self.chai = CheckersAI()
         # Enable Baxter
         baxter_interface.robot_enable.RobotEnable()
         rospy.loginfo("Baxter Enabled!")
@@ -32,9 +35,91 @@ class Client():
         # Initialise goal msg
         self.pp_goal = PickPlaceGoal()
 
+        # Board State Subscriber
+        self.count = 0
+        self.board_state = ""
+        self.subBS = rospy.Subscriber('Board_State',
+                                      String,
+                                      self.callback_BS,
+                                      queue_size=1)
+
+        # Board Dictionary from Top Left
+        self.SW = 0.0559
+        self.board_dict = {
+            0: [self.SW * 6.5, self.SW * 6.5],
+            1: [self.SW * 6.5, self.SW * 5.5],
+            2: [self.SW * 6.5, self.SW * 4.5],
+            3: [self.SW * 6.5, self.SW * 3.5],
+            4: [self.SW * 6.5, self.SW * 2.5],
+            5: [self.SW * 6.5, self.SW * 1.5],
+            6: [self.SW * 6.5, self.SW * 0.5],
+            7: [self.SW * 6.5, self.SW * -0.5],
+            8: [self.SW * 5.5, self.SW * 6.5],
+            9: [self.SW * 5.5, self.SW * 5.5],
+            10: [self.SW * 5.5, self.SW * 4.5],
+            11: [self.SW * 5.5, self.SW * 3.5],
+            12: [self.SW * 5.5, self.SW * 2.5],
+            13: [self.SW * 5.5, self.SW * 1.5],
+            14: [self.SW * 5.5, self.SW * 0.5],
+            15: [self.SW * 5.5, self.SW * -0.5],
+            16: [self.SW * 4.5, self.SW * 6.5],
+            17: [self.SW * 4.5, self.SW * 5.5],
+            18: [self.SW * 4.5, self.SW * 4.5],
+            19: [self.SW * 4.5, self.SW * 3.5],
+            20: [self.SW * 4.5, self.SW * 2.5],
+            21: [self.SW * 4.5, self.SW * 1.5],
+            22: [self.SW * 4.5, self.SW * 0.5],
+            23: [self.SW * 4.5, self.SW * -0.5],
+            24: [self.SW * 3.5, self.SW * 6.5],
+            25: [self.SW * 3.5, self.SW * 5.5],
+            26: [self.SW * 3.5, self.SW * 4.5],
+            27: [self.SW * 3.5, self.SW * 3.5],
+            28: [self.SW * 3.5, self.SW * 2.5],
+            29: [self.SW * 3.5, self.SW * 1.5],
+            30: [self.SW * 3.5, self.SW * 0.5],
+            31: [self.SW * 3.5, self.SW * -0.5],
+            32: [self.SW * 2.5, self.SW * 6.5],
+            33: [self.SW * 2.5, self.SW * 5.5],
+            34: [self.SW * 2.5, self.SW * 4.5],
+            35: [self.SW * 2.5, self.SW * 3.5],
+            36: [self.SW * 2.5, self.SW * 2.5],
+            37: [self.SW * 2.5, self.SW * 1.5],
+            38: [self.SW * 2.5, self.SW * 0.5],
+            39: [self.SW * 2.5, self.SW * -0.5],
+            40: [self.SW * 1.5, self.SW * 6.5],
+            41: [self.SW * 1.5, self.SW * 5.5],
+            42: [self.SW * 1.5, self.SW * 4.5],
+            43: [self.SW * 1.5, self.SW * 3.5],
+            44: [self.SW * 1.5, self.SW * 2.5],
+            45: [self.SW * 1.5, self.SW * 1.5],
+            46: [self.SW * 1.5, self.SW * 0.5],
+            47: [self.SW * 1.5, self.SW * -0.5],
+            48: [self.SW * 0.5, self.SW * 6.5],
+            49: [self.SW * 0.5, self.SW * 5.5],
+            50: [self.SW * 0.5, self.SW * 4.5],
+            51: [self.SW * 0.5, self.SW * 3.5],
+            52: [self.SW * 0.5, self.SW * 2.5],
+            53: [self.SW * 0.5, self.SW * 1.5],
+            54: [self.SW * 0.5, self.SW * 0.5],
+            55: [self.SW * 0.5, self.SW * -0.5],
+            56: [self.SW * -0.5, self.SW * 6.5],
+            57: [self.SW * -0.5, self.SW * 5.5],
+            58: [self.SW * -0.5, self.SW * 4.5],
+            59: [self.SW * -0.5, self.SW * 3.5],
+            60: [self.SW * -0.5, self.SW * 2.5],
+            61: [self.SW * -0.5, self.SW * 1.5],
+            62: [self.SW * -0.5, self.SW * 0.5],
+            63: [self.SW * -0.5, self.SW * -0.5]
+        }
+
     def feedback_pp(self, msg):
         # do something here
         rospy.loginfo("Completed Moves: {}".format(msg))
+
+    def callback_BS(self, msg):
+        if self.count == 0:
+            self.board_state = msg
+            self.count = 1
 
 
 class SETUP(smach.State):
@@ -83,11 +168,19 @@ class SETUP(smach.State):
         # Make sure pp arm at home
         self.setup_goal(home=True)
         # Put camera at view
-        self.setup_goal(camera_view=True)
+        # self.setup_goal(camera_view=True)
         # Input in case user wants to perform manual calibration
+        left_gripper = Gripper('left', CHECK_VERSION)
+        # Reboot Gripper
+        left_gripper.reboot()
+        # Calibrate Gripper
+        left_gripper.calibrate()
+        # Open Gripper
+        left_gripper.close()
         rospy.loginfo("Hit enter when the camera arm is at the desired pose")
         raw_input()
         self.setup_goal(calibrate=True)
+        rospy.sleep(1)
         # Return camera home
         self.setup_goal(camera_home=True)
 
@@ -107,15 +200,19 @@ class PICKCOLOR(smach.State):
         self.client = client
 
     def execute(self, userdata):
-        rospy.loginfo('Pick a color')
+        rospy.loginfo('Pick a color for BAXTER, p or g')
         # Call AS to determine if baxter is red or black
         # userdata.client.pc_client.send goal
         # userdata.client.pc_client.wait_for_result()
         # result = userdata.client.pc_client.get_result()
         color = raw_input()
-        if color == 'b':
+        if color == 'p':
+            self.client.chai.board.baxter_color = "black"
+            self.client.chai.board.not_baxter = "red"
             return 'black'
         else:
+            self.client.chai.board.baxter_color = "red"
+            self.client.chai.board.not_baxter = "black"
             return 'red'
 
 
@@ -135,40 +232,7 @@ class MYTURN(smach.State):
     def __init__(self, client):
         smach.State.__init__(self,
                              outcomes=['move', 'exit'],
-                             output_keys=['board_state'])
-        # Initialise client
-        self.client = client
-
-    def execute(self, userdata):
-        rospy.loginfo('Reading board state')
-        # Call AS to read board state and feed data to logic
-        # userdata.client.boardstate_client.send goal
-        # userdata.client.board_client.wait_for_result()
-        # result = userdata.client.boardstate_client.get_result()
-        # userdata.board_state = result
-        rospy.loginfo("Let's see how well you played...")
-
-        # Call logic function to determine win/lose
-        end_game = False
-        status = "win"
-        if end_game is True:
-            if status == "win":
-                rospy.loginfo("Ha! I win!")
-            elif status == "draw":
-                rospy.loginfo("Everyone is a winner!")
-            elif status == "lose":
-                rospy.loginfo("You win :(")
-            return 'exit'
-        else:
-            return 'move'
-
-
-class MOVE(smach.State):
-    # Place Client Object in State init
-    def __init__(self, client):
-        smach.State.__init__(self,
-                             outcomes=['wait', 'exit'],
-                             input_keys=['board_state'])
+                             output_keys=['moves'])
         # Initialise client
         self.client = client
 
@@ -212,35 +276,120 @@ class MOVE(smach.State):
             rospy.loginfo("Cartesian path {}".format(cart))
 
     def execute(self, userdata):
-        # Call Logic fcn to determine next move
-        # userdata.client.move_client.send goal board_state
-        # userdata.client.move_client.wait_for_result()
-        # result = userdata.client.move_client.get_result()
-
+        rospy.loginfo("Moving Camera to View")
+        # Call AS to put camera at view position
+        self.pp_goal(camera_view=True)
+        rospy.loginfo('Reading board state')
+        # Call AS to read board state and feed data to logic
+        # SUBSCRIBE TO \Board_State and get board state
+        self.count = 0
+        rospy.sleep(1)
+        list_from_cam = self.client.board_state
+        move_list = self.client.chai.give_command(list_from_cam)
+        # Output moves to MOVE state
+        userdata.moves = move_list
+        rospy.loginfo("Let's see how well you played...")
         # Call AS to put camera at home position
         self.pp_goal(camera_home=True)
 
+        # Call logic function to determine win/lose
+        # end_game = self.client.chai.game_over
+        # winner = self.client.chai.winner
+        end_game = False
+        status = "win"
+        if end_game is True:
+            if status == "win":
+                rospy.loginfo("Ha! I win!")
+            elif status == "draw":
+                rospy.loginfo("Everyone is a winner!")
+            elif status == "lose":
+                rospy.loginfo("You win :(")
+            return 'exit'
+        else:
+            return 'move'
+
+
+class MOVE(smach.State):
+    # Place Client Object in State init
+    def __init__(self, client):
+        smach.State.__init__(self,
+                             outcomes=['wait', 'exit'],
+                             input_keys=['moves'])
+        # Initialise client
+        self.client = client
+
+    def pp_goal(self,
+                pick_goal=[0, 0],
+                place_goal=[0, 0],
+                home=False,
+                calibrate=False,
+                camera_view=False,
+                camera_home=False):
+        """ DESCRIPTION
+
+            Args:
+
+            Returns:
+        """
+        self.client.pp_goal.pick_goal = pick_goal
+        self.client.pp_goal.place_goal = place_goal
+        self.client.pp_goal.home = home
+        self.client.pp_goal.calibrate = calibrate
+        self.client.pp_goal.camera_view = camera_view
+        self.client.pp_goal.camera_home = camera_home
+
+        if home is True or calibrate is True or camera_view is True or camera_home is True:
+            self.client.pp_client.send_goal(self.client.pp_goal)
+            self.client.pp_client.wait_for_result()
+            if home is True:
+                rospy.loginfo("Returned to Home Position")
+            elif calibrate is True:
+                rospy.loginfo("Calibrated")
+            elif camera_view is True:
+                rospy.loginfo("Camera at View Position")
+            elif camera_home is True:
+                rospy.loginfo("Camera at Home Position")
+
+        else:
+            self.client.pp_client.send_goal(
+                self.client.pp_goal, feedback_cb=self.client.feedback_pp)
+            self.client.pp_client.wait_for_result()
+            cart = self.client.pp_client.get_result()
+            rospy.loginfo("Cartesian path {}".format(cart))
+
+    def execute(self, userdata):
         # Call AS to perform pick-place per move
         # FOR EACH BAXTER MOVE
-        pick_goal = [0, 0]  # [0.5 * 0.0559, -0.5 * 0.0559]
-        place_goal = [0, 0]
+        moves = userdata.moves
+        # Pick and Place always 0 and 1
+        # pick_index = moves[0]
+        # place_index = moves[1]
+        pick_index = 62
+        place_index = 63
+        pick_goal = self.client.board_dict[pick_index]
+        place_goal = self.client.board_dict[place_index]
         home = False
         self.pp_goal(pick_goal, place_goal, home)
 
         # Call AS to perform pick-place per discard
         # FOR EACH BAXTER DISCARD
-        pick_goal = [0, 0]
-        place_goal = [0, 0]
-        home = False
-        self.pp_goal(pick_goal, place_goal, home)
+        # Pieces to discard start from 2
+        print(moves)
+        moves = [0]
+        if len(moves) > 2:
+            for i in range(2, len(moves)):
+                discard_index = moves[i]
+                pick_goal = self.client.board_dict[discard_index]
+                place_goal = [0.5, -0.3]
+                home = False
+                self.pp_goal(pick_goal, place_goal, home)
 
         # Call AS to go home to clear board for camera
         self.pp_goal(home=True)
 
-        # Call AS to put camera at view position
-        self.pp_goal(camera_view=True)
-
         # Call logic function to determine win/lose
+        # end_game = self.client.chai.game_over
+        # winner = self.client.chai.winner
         end_game = False
         status = "win"
         if end_game is True:
@@ -324,7 +473,7 @@ def main():
                                    'move': 'MOVE',
                                    'exit': 'SHUTDOWN'
                                },
-                               remapping={'board_state': 'board_state'})
+                               remapping={'moves': 'moves'})
         # Move State
         smach.StateMachine.add('MOVE',
                                MOVE(client),
@@ -332,7 +481,7 @@ def main():
                                    'wait': 'WAIT',
                                    'exit': 'SHUTDOWN'
                                },
-                               remapping={'board_state': 'board_state'})
+                               remapping={'moves': 'moves'})
         # Shutdown State
         smach.StateMachine.add('SHUTDOWN',
                                SHUTDOWN(),
