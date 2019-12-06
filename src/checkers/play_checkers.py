@@ -342,9 +342,9 @@ class Board():
         c = 0
         if isinstance(list,str):
             list = list.split(' ')
-        #print(list)
+        print(list)
         for ele in list:
-            #print('element: '+str(ele))
+            print('element: '+str(ele))
             if isinstance(ele,str):
                 if ele == 'purple' or ele == 'black':
                     piece = -1
@@ -353,14 +353,19 @@ class Board():
                 else:
                     piece = 0
                 state[r][c] = piece
+                if c == 7:
+                    r += 1
+                    c = 0
+                else:
+                    c += 1
             else:
                 state[r][c] = ele
-            #print(state)
-            if c == 7:
-                r += 1
-                c = 0
-            else:
-                c += 1
+                #print(state)
+                if c == 7:
+                    r += 1
+                    c = 0
+                else:
+                    c += 1
         #state = self.flip_board(state)
         if self.baxter_color == None:
             if state[-1][-2] == 1: #colors determined here !!

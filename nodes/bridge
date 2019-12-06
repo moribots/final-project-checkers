@@ -373,7 +373,10 @@ class Vision():
 
         board_state3 = ''
         for i in range(64):
-            board_state3 = board_state3 + ' ' + board_state2[i]
+            if i ==0:
+                board_state3 = board_state2[i]
+            else:
+                board_state3 = board_state3 + ' ' + board_state2[i]
         print('boardstate3')
         print(board_state3)
         self.pub2.publish(board_state3)

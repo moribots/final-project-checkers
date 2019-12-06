@@ -118,7 +118,7 @@ class Client():
 
     def callback_BS(self, msg):
         if self.count == 0:
-            self.board_state = msg
+            self.board_state = msg.data
             self.count = 1
 
 
@@ -207,10 +207,12 @@ class PICKCOLOR(smach.State):
         # result = userdata.client.pc_client.get_result()
         color = raw_input()
         if color == 'p':
+            rospy.loginfo("BAXER IS {}".format("Purple"))
             self.client.chai.board.baxter_color = "black"
             self.client.chai.board.not_baxter = "red"
             return 'black'
         else:
+            rospy.loginfo("BAXER IS {}".format("Green"))
             self.client.chai.board.baxter_color = "red"
             self.client.chai.board.not_baxter = "black"
             return 'red'
@@ -279,12 +281,23 @@ class MYTURN(smach.State):
         rospy.loginfo("Moving Camera to View")
         # Call AS to put camera at view position
         self.pp_goal(camera_view=True)
+        rospy.sleep(1)
         rospy.loginfo('Reading board state')
         # Call AS to read board state and feed data to logic
         # SUBSCRIBE TO \Board_State and get board state
-        self.count = 0
-        rospy.sleep(1)
-        list_from_cam = self.client.board_state
+        # Read until valid board state (at least 2 pcs)
+        str_count = 0
+        while str_count < 2:
+            self.count = 0
+            rospy.sleep(0.5)
+            list_from_cam = self.client.board_state
+            str_check = list_from_cam.split(" ")
+            for item in str_check:
+                if item != "empty":
+                    str_count += 1
+
+        rospy.loginfo("LIST")
+        rospy.loginfo(list_from_cam)
         move_list = self.client.chai.give_command(list_from_cam)
         # Output moves to MOVE state
         userdata.moves = move_list
@@ -362,10 +375,10 @@ class MOVE(smach.State):
         # FOR EACH BAXTER MOVE
         moves = userdata.moves
         # Pick and Place always 0 and 1
-        # pick_index = moves[0]
-        # place_index = moves[1]
-        pick_index = 62
-        place_index = 63
+        pick_index = moves[0]
+        place_index = moves[1]
+        # pick_index = 62
+        # place_index = 63
         pick_goal = self.client.board_dict[pick_index]
         place_goal = self.client.board_dict[place_index]
         home = False
@@ -374,13 +387,13 @@ class MOVE(smach.State):
         # Call AS to perform pick-place per discard
         # FOR EACH BAXTER DISCARD
         # Pieces to discard start from 2
-        print(moves)
-        moves = [0]
+        rospy.loginfo("MOVES")
+        rospy.loginfo(moves)
         if len(moves) > 2:
             for i in range(2, len(moves)):
                 discard_index = moves[i]
                 pick_goal = self.client.board_dict[discard_index]
-                place_goal = [0.5, -0.3]
+                place_goal = [0.3, -0.3]
                 home = False
                 self.pp_goal(pick_goal, place_goal, home)
 
