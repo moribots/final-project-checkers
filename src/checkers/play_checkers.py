@@ -102,12 +102,7 @@ class CheckersAI():
         elif self.noCapture > 50:
             self.winner = 'Draw'
             self.game_over = True
-        print('Is game over? '+str(self.game_over))
-        #if self.game_over:
-        #    if self.winner == 'Draw':
-        #        print()
-        #    print('The winner is '+str(self.winner))
-        #return self.game_over
+        # print('Is game over? '+str(self.game_over))
 
     def grid_to_world(self,move,captured):
         '''Converts moves from grid coordinates to index of 1-d list refering to board positions
@@ -123,63 +118,77 @@ class CheckersAI():
         print('Move list: '+str(movelist))
         return movelist
 
-
-
-
-    def make_move(self,move,cap,state):
+    def make_move(self,move,cap,state,p):
         '''make a array of board states (nodes) after all legal moves starting from current state. include whether or not the node is terminal'''
         if len(state) > 8:
             #print('world_to_grid')
             state = self.board.world_to_grid(state)
-        print('moves: '+str(move))
-        print('captures: '+str(cap))
+        #print('moves: '+str(move))
+        #print('captures: '+str(cap))
         K = 1
-        if self.board.p == 1 and move[1][0] == 0 or self.board.p == -1 and move[1][0] == 7 or state[move[0][0]][move[0][1]] == self.board.p*2:
+        if p == 1 and move[1][0] == 0 or p == -1 and move[1][0] == 7 or state[move[0][0]][move[0][1]] == p*2:
             K = 2
         state[move[0][0]][move[0][1]] = 0
-        state[move[1][0]][move[1][1]] = K*self.board.p #should still be the last players value
+        state[move[1][0]][move[1][1]] = K*p #should still be the last players value
         captured = []
         if len(cap) != 0 and cap[0][0] == move[0]:
             for piece in cap:
-                print('Capture '+str(piece))
+                # print('Capture '+str(piece))
                 captured.append(state[piece[1][0]][piece[1][1]])
                 state[piece[1][0]][piece[1][1]] = 0
                 self.noCapture = 0
         else:
             self.noCapture += 1 #if it counts too high its a draw
         self.is_game_over(state)
-        if self.game_over:
-            print('Game over: Winner: '+str(self.winner))
+        #if self.game_over:
+            # print('Game over: Winner: '+str(self.winner))
         #nodes.append([move,temp_state,w])
         return state,captured
 
-    def undo_move(self,move,cap,cap_piece,state):
+    def undo_move(self,move,cap,cap_piece,state,player):
         K = 1
-        if state[move[1][0]][move[1][1]] == self.board.p*2: #only have to worry about piece before move
+        #player = self.board.p #Assumes winning player made the last move
+        #if self.game_over == False: #max level reached so other play made the last move
+        #    player = self.board.not_p
+        if state[move[1][0]][move[1][1]] == player*2: #only have to worry about piece before move
             K = 2
         state[move[1][0]][move[1][1]] = 0
-        state[move[0][0]][move[0][1]] = K*self.board.p #should still be the last players value
+        state[move[0][0]][move[0][1]] = K*player #should still be the last players value
         if len(cap) != 0 and cap[0][0] == move[0]:
             for i in range(len(cap)):
                 #print('Capture '+str(piece))
                 state[cap[i][1][0]][cap[i][1][1]] = cap_piece[i]
                 self.noCapture -= 1
+        # print(np.array(state))
         return state
 
-    def minimax(self,state_list):
+    def minimax(self,state):#_list):
         '''Minimax algorithm to get best moves for baxter
             ARGS: max: (bool) is maximizing player?'''
-        state = self.board.world_to_grid(state_list)
-        moves,cap = self.board.get_moves(state,self.board.baxter_color)
-        if len(moves) == 1: return moves, cap
+        #state = self.board.world_to_grid(state_list)
+        best_move = []
+        moves,cap,p = self.board.get_moves(state,self.board.baxter_color)
+        if len(moves) == 1: return self.grid_to_world(moves,cap) #captured moves are forced
         else:
-            #print(state)
             self.path = []
             bestvalue = self.prune(self.alpha,self.beta,state,'max',0)
             print('Best_value: '+str(bestvalue))
-            # print(self.path)
-        best_move = []
-
+            print(self.path)
+            print(moves)
+            for move in moves:
+                for step in self.path:
+                    if step[1] == move and step[1] >= bestvalue:
+                        best_move.append(move)
+            print(best_move)
+            i = 0
+            if len(best_move) > 1:
+                i = np.random.randint(0,len(best_move))
+            picked_best = best_move[i]
+            print(np.array(state))
+            after = self.make_move(picked_best,cap,state,p)
+            print('playing picked move')
+            print(np.array(after[0]))
+            return self.grid_to_world(picked_best,cap) #cap should be None
 
 
 
@@ -193,83 +202,93 @@ class CheckersAI():
         self.is_game_over(node)
         #print('black: '+str(self.board.black_piece_count))
         #print('red: '+str(self.board.red_piece_count))
-        if self.game_over: #or level > 20: #return utility of the node if terminal node
-            print('GAMEOVER')
-            if self.winner == 'baxter': #returns count of baxter's pieces
-                if self.board.baxter_color == 'black':
-                    val = self.board.black_piece_count
+        if self.game_over or level > 20: #return utility of the node if terminal node
+            if self.game_over == False:
+                if is_max:
+                    if self.board.baxter_color == 'black':
+                        val = self.board.black_total
+                    else:
+                        val = self.board.red_total
                 else:
-                    val = self.board.red_piece_count
-            elif self.winner == 'not_baxter': #return the count of not baxter's pieces
-                if self.board.not_baxter == 'black':
-                    val = self.board.black_piece_count
-                else:
-                    val = self.board.red_piece_count
+                    if self.board.baxter_color == 'black':
+                        val = self.board.black_total
+                    else:
+                        val = self.board.red_total
             else:
-                val = 0 #if draw score is zero
+                # print('GAMEOVER')
+                if self.winner == 'baxter': #returns count of baxter's pieces
+                    if self.board.baxter_color == 'black':
+                        val = self.board.black_total
+                    else:
+                        val = self.board.red_total
+                elif self.winner == 'not_baxter': #return the count of not baxter's pieces
+                    if self.board.not_baxter == 'black':
+                        val = self.board.black_total
+                    else:
+                        val = self.board.red_total
+                else:
+                    val = 0 #if draw score is zero
             #self.path.append([move_taken,val])
-            print('\nreturning '+str(val))
+            print('Terminal, returning '+str(val))
             return val
 
         if is_max == 'max': #baxter is maximizing
-            # print('Max turn '+str(level))
             #print(self.baxter_color)
-            moves,cap = self.board.get_moves(node,self.board.baxter_color) #gets moves for current node
+            moves,cap,p = self.board.get_moves(node,self.board.baxter_color) #gets moves for current node
             #val = alpha
             count = 0
-            print(moves)
+            # print(moves)
             init_state = copy.deepcopy(node)
             for move in moves:
-                print('next move')
                 count += 1
-                child,captured = self.make_move(move,cap,init_state)
-                print('child:\n '+str(np.array(child)))
-                #print('recursing_max')
+                print('Max next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
+                child,captured = self.make_move(move,cap,init_state,p)
+                # print('child:\n '+str(np.array(child)))
                 #print((self.prune(alpha,beta,child,'min',level-1)))
                 alpha = max(alpha,(self.prune(alpha,beta,child,'min',level+1)))
                 self.path.append([self.board.baxter_color,move,alpha])
                 #print('value: '+str(val))
                 # print('alpha: '+str(alpha))
                 # print('for Move '+str(count))
-                #node = self.undo_move(move,cap,captured,child)
+                '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
+                init_state = self.undo_move(move,cap,captured,child,p)
+                self.game_over = False #
+                self.winner = None
                 if beta <= alpha: #don't update alpha and prune if its greater than beta
-                    #print('returning_val_max: '+str(val))
-                    # print('return alpha')
+                    print('Prune')
+                    print('return alpha: '+str(alpha))
                     return alpha
                 #alpha = max(alpha,val)
-            # print('returning val (max): '+str(alpha))
-            #print('not recursing max')
-            return alpha #return maximum of all children
+                print('returning val (max): '+str(alpha))
+                return alpha #return maximum of all children
+
         else: #minimizing player
-            # print('Min turn '+str(level))
-            moves, cap = self.board.get_moves(node,self.board.not_baxter) #gets moves for current node
-            print(moves)
-            #print(node)
+            moves, cap,p = self.board.get_moves(node,self.board.not_baxter) #gets moves for current node
+            # print(moves)
             #val = beta
             init_state = copy.deepcopy(node)
             count = 0
             for move in moves:
-                print('Next move')
                 count += 1
-                child,captured = self.make_move(move,cap,init_state)
-                print('child:\n '+str(np.array(child)))
-                #print('recursing_min')
+                print('Min next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
+                child,captured = self.make_move(move,cap,init_state,p)
+                # print('child:\n '+str(np.array(child)))
                 #print(self.prune(alpha,beta,child,'max',level-1))
                 beta = min((self.prune(alpha,beta,child,'max',level+1)),beta)
-                self.path.append([self.board.not_baxter,move,beta])
-                #print('value: '+str(val))
-
+                #self.path.append([self.board.not_baxter,move,beta])
                 # print('beta: '+str(beta))
                 # print('for Move '+str(count))
-                node = self.undo_move(move,cap,captured,child)
+                '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
+                init_state = self.undo_move(move,cap,captured,child,p)
+                self.game_over = False
+                self.winner = None
                 if beta <= alpha: #don't update alpha and prune if its greater than beta
-                    #print('returning_val_min: '+str(val))
-                    #print('return alpha')
+                    print('Prune')
+                    print('return beta:'+str(beta))
                     return beta
                 #beta = min(beta,val)
-            #print('returning val (min): '+str(beta))
-            #print('not recursing min')
-            return beta #return minimum of all children
+                print('returning val (min): '+str(beta))
+                return beta #return minimum of all children
 
 
 class Board():
@@ -295,12 +314,20 @@ class Board():
     def get_piece_count(self,state):
         self.red_piece_count = 0
         self.black_piece_count = 0
+        self.red_total = 0
+        self.black_total = 0
+        red_king_count = 0
+        black_king_count = 0
         for row in state:
             for col_ele in row:
                 if col_ele < 0:
                     self.black_piece_count += 1
+                    if col_ele == -2: black_king_count += 1
                 elif col_ele > 0:
                     self.red_piece_count += 1
+                    if col_ele == 2: red_king_count += 1
+        self.red_total = self.red_piece_count + red_king_count
+        self.black_total = self.black_piece_count + black_king_count
 
     def world_to_grid(self,list):
         '''recieve list[0,63], left to right, top to bottom from top left of board, index refers to grid square (inorder),elements are 'empty','color1',color2,'color1_king',color2_king'''
@@ -470,6 +497,6 @@ class Board():
                         #return temp_moves, capture
                         #for move in mk
         if len(capture) != 0:
-            return capture_move, capture
+            return capture_move, capture,self.p
 
-        return moves,capture
+        return moves,capture,self.p
