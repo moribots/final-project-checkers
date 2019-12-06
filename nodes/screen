@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+"""
+Display right hand camera image on baxter head screen.
+
+PUBLISHERS:
+  + /robot/xdisplay (sensor_msgs/Image) ~ head screen
+
+SUBSCRIBES:
+  + /cameras/right_hand_camera/image (sensor_msgs/Image) ~ right hand camera
+
+"""
+import rospy
+from sensor_msgs.msg import Image
+
+pub = rospy.Publisher('/robot/xdisplay', Image, queue_size=10)
+   
+def callback(msg):
+    pub.publish(msg)
+
+def display():
+    rospy.init_node('head_screen_display', anonymous=True)
+    rospy.Subscriber('/cameras/right_hand_camera/image', Image, callback)
+    rospy.spin()
+
+if __name__ == '__main__':
+    try:
+        display()
+    except rospy.ROSInterruptException:
+        pass
