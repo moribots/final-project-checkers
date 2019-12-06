@@ -251,7 +251,7 @@ class Vision():
             for c in circles_red:
                 # compute the center of the contour
                 M = cv2.moments(c)
-                if cv2.contourArea(c) > 100:
+                if cv2.contourArea(c) > 50:
                     cX = int(M["m10"] / M["m00"])
                     cY = int(M["m01"] / M["m00"])
                     cv2.circle(frame, (cX, cY), 5, (0, 255, 255),-1)
@@ -285,7 +285,7 @@ class Vision():
             for c in circles_blue:
                 # compute the center of the contour
                 M = cv2.moments(c)
-                if cv2.contourArea(c) > 100:
+                if cv2.contourArea(c) > 50:
                     cX = int(M["m10"] / M["m00"])
                     cY = int(M["m01"] / M["m00"])
                     cv2.circle(frame, (cX, cY), 5, (255, 255, 255),-1)
