@@ -344,7 +344,7 @@ class Board():
             list = list.split(' ')
         # print(list)
         for ele in list:
-            print('element: '+str(ele))
+            # print('element: '+str(ele))
             if isinstance(ele,str):
                 if ele == 'purple' or ele == 'black':
                     piece = -1

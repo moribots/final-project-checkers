@@ -424,7 +424,7 @@ class MYTURN(smach.State):
                     print("found one")
                     self.client.str_count += 1
 
-        rospy.loginfo(list_from_cam)
+        rospy.logdebug(list_from_cam)
         move_list = self.client.chai.give_command(list_from_cam)
         rospy.logdebug(move_list)
         # Output moves to MOVE state
