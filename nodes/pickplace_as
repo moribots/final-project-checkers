@@ -145,7 +145,7 @@ class PickPlace():
         # z is the z position of the objects we want to grasp
         # set to the table z origin plus half the table height
         # self.z_org is the z origin
-        self.z_org = -0.229  # SMALL TABLE: -0.31
+        self.z_org = -0.23  # SMALL TABLE: -0.31
         self.z = self.z_org + 0.05
 
         # Add table as collision object
@@ -294,7 +294,7 @@ class PickPlace():
         # For testing:
         # current_pose = self.move_group.get_current_pose().pose
 
-    def pick_cartesian(self, goal, feedback):
+    def pick_cartesian(self, goal, feedback, cal=False):
         """ Receives a pick goal and performs 4 actions:
 
             1 - Moves to a pre-grasp position (approach) in the
@@ -324,25 +324,27 @@ class PickPlace():
                      also returns result: "succeeded" or "compromised" for
                      result return
         """
+        # Make sure gripper open
+        self.right_gripper.open()
         # path_type counter, if more than one is "pose", return compromised
         comp_count = 0
         # GO TO HOME
-        # rospy.loginfo("================== Home ==============")
-        # # Go to pick_place home config
-        # j0 = 0.09395632325798159
-        # j1 = 0.31
-        # j2 = 1.23
-        # j3 = 2.43
-        # j4 = 1.08
-        # j5 = -1.57
-        # j6 = 0.233
-        # # SMALL TABLE
-        # # j0 = 0.09395632325798159 j1 = 0.4088058799714628 j2 = 1.313087554429914 j3 = 1.9941750242510379 j4 = 1.0657331523833913 j5 = -1.5274613695369008 j6 = 1.3652429012180183
-        # self.go_to_joint_state(j0, j1, j2, j3, j4, j5, j6)
-        # # Publish feedback
-        # feedback.completed_moves.append("home_start")
-        # self.asrv.publish_feedback(feedback)
-        # rospy.sleep(0.5)
+        rospy.loginfo("================== Home ==============")
+        # Go to pick_place home config
+        j0 = 0.09395632325798159
+        j1 = 0.31
+        j2 = 1.23
+        j3 = 2.43
+        j4 = 1.08
+        j5 = -1.57
+        j6 = 0.233
+        # SMALL TABLE
+        # j0 = 0.09395632325798159 j1 = 0.4088058799714628 j2 = 1.313087554429914 j3 = 1.9941750242510379 j4 = 1.0657331523833913 j5 = -1.5274613695369008 j6 = 1.3652429012180183
+        self.go_to_joint_state(j0, j1, j2, j3, j4, j5, j6)
+        # Publish feedback
+        feedback.completed_moves.append("home_start")
+        self.asrv.publish_feedback(feedback)
+        rospy.sleep(0.5)
 
         # APPROACH GOAL
         rospy.loginfo("================== Approach ==============")
@@ -369,17 +371,18 @@ class PickPlace():
         feedback.completed_moves.append("pick")
         self.asrv.publish_feedback(feedback)
         rospy.sleep(0.5)
-
-        # RETREAT GOAL (same as approach)
-        rospy.loginfo("================== Retreat ==============")
-        # Pass the goal and the retreat z coordinate
-        path_type = self.create_path(goal, self.z + self.standoff, only_z=True)
-        if path_type == "pose":
-            comp_count += 1
-        # Publish feedback
-        feedback.completed_moves.append("pick_retreat")
-        self.asrv.publish_feedback(feedback)
-        rospy.sleep(0.5)
+        # Non-Calibration Condition
+        if cal is False:
+            # RETREAT GOAL (same as approach)
+            rospy.loginfo("================== Retreat ==============")
+            # Pass the goal and the retreat z coordinate
+            path_type = self.create_path(goal, self.z + self.standoff, only_z=True)
+            if path_type == "pose":
+                comp_count += 1
+            # Publish feedback
+            feedback.completed_moves.append("pick_retreat")
+            self.asrv.publish_feedback(feedback)
+            rospy.sleep(0.5)
 
         # Return result for Action result
         result = ""
@@ -681,13 +684,13 @@ class PickPlace():
             result.status = "calibrated"
         # Move Camera to View Position
         elif goal.camera_view is True:
-            j0 = -0.79
-            j1 = -0.64
-            j2 = -1.22
-            j3 = 0.73
-            j4 = 0.95
-            j5 = 1.835
-            j6 = -0.75
+            j0 = -1.25  # -0.79
+            j1 = -0.57  # -0.64
+            j2 = -1.67  # -1.22
+            j3 = -0.05  # 0.73
+            j4 = 1.76  # 0.95
+            j5 = 2.09  # 1.835
+            j6 = -0.44  # -0.75
             self.left_gripper.open()
             self.cam_joint_state(j0, j1, j2, j3, j4, j5, j6)
             result.status = "view"
@@ -698,11 +701,14 @@ class PickPlace():
             result.status = "camera_home"
         # Perform Pick Place
         else:
-            # Execute Pick Routine
-            pick_result = self.pick_cartesian(pick_goal, feedback)
+            if pick_goal == place_goal:
+                pick_result = self.pick_cartesian(pick_goal, feedback, cal=True)
+            else:
+                # Execute Pick Routine
+                pick_result = self.pick_cartesian(pick_goal, feedback)
 
-            # Execute Place Routine
-            place_result = self.place_cartesian(place_goal, feedback)
+                # Execute Place Routine
+                place_result = self.place_cartesian(place_goal, feedback)
 
             # Return result
             if pick_result == "compromised" or place_result == "compromised":

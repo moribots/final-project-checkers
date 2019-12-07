@@ -255,6 +255,15 @@ class SETUP(smach.State):
         rospy.sleep(1)
         # Return camera home
         self.setup_goal(camera_home=True)
+        rospy.sleep(1)
+        # Calibrate board opp corner
+        pick_goal = self.client.board_dict[0]
+        place_goal = self.client.board_dict[0]
+        self.setup_goal(pick_goal=pick_goal, place_goal=place_goal)
+        rospy.loginfo("Hit enter when board is aligned with the right arm.")
+        raw_input()
+        # Make sure pp arm at home
+        self.setup_goal(home=True)
         rospy.loginfo('Hit enter when you are ready to play.')
         raw_input()
         rospy.loginfo("======= Calibrated =======")
@@ -544,14 +553,17 @@ class MOVE(smach.State):
             # place_index = 63
             pick_goal = self.client.board_dict[pick_index]
             # x offset
-            if pick_index < 40:
-                x_ofst = 0
-            else:
-                x_ofst = 0
-                # x_ofst = 25e-3
+            # if pick_index < 40:
+            #     y_ofst = 0
+            # else:
+            #     y_ofst = 0
+            x_ofst = 0  # 25e-3 / 3
+            y_ofst = 0  # 25e-3 / 2
             pick_goal[0] += x_ofst
+            pick_goal[1] += y_ofst
             place_goal = self.client.board_dict[place_index]
             place_goal[0] += x_ofst
+            place_goal[1] += y_ofst
             home = False
             self.pp_goal(pick_goal, place_goal, home)
 
@@ -563,6 +575,7 @@ class MOVE(smach.State):
                     discard_index = moves[i]
                     pick_goal = self.client.board_dict[discard_index]
                     pick_goal[0] += x_ofst
+                    pick_goal[1] += y_ofst
                     place_goal = [0.3, -0.3]
                     home = False
                     self.pp_goal(pick_goal, place_goal, home)
