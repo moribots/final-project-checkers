@@ -11,19 +11,33 @@ SUBSCRIBES:
 """
 import rospy
 from sensor_msgs.msg import Image
+from std_msgs.msg import String
 
-pub = rospy.Publisher('/robot/xdisplay', Image, queue_size=10)
-   
-def callback(msg):
-    pub.publish(msg)
+class Display(object):
+    def __init__(self):
+        self.rsub = rospy.Subscriber('/cameras/right_hand_camera/image', Image, callback1)
+        self.lsub = rospy.Subscriber('proc_img', Image, callback2)
+        self.decisionsub = rospy.Subscriber('lr', String, callback3)
+        self.pub = rospy.Publisher('/robot/xdisplay', Image, queue_size=1)
 
-def display():
+    def callback1(msg):
+        self.r = msg
+
+    def callback2(msg):
+        self.l = msg
+    
+    def callback3(msg):
+        if msg == 'left':
+            self.pub.publish(self.l)
+        else:
+            self.pub.publish(self.r)
+
+def main():
     rospy.init_node('head_screen_display', anonymous=True)
-    rospy.Subscriber('/cameras/right_hand_camera/image', Image, callback)
     rospy.spin()
 
 if __name__ == '__main__':
     try:
-        display()
+        main()
     except rospy.ROSInterruptException:
         pass
