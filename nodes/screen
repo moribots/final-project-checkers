@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+"""
+Display right hand camera image on baxter head screen.
+
+PUBLISHERS:
+  + /robot/xdisplay (sensor_msgs/Image) ~ head screen
+
+SUBSCRIBES:
+  + /cameras/right_hand_camera/image (sensor_msgs/Image) ~ right hand camera
+
+"""
+import rospy
+from sensor_msgs.msg import Image
+from std_msgs.msg import String
+
+
+class Display(object):
+    def __init__(self):
+        self.arm = "left"
+        self.rsub = rospy.Subscriber('/cameras/right_hand_camera/image',
+                                     Image,
+                                     self.callback1,
+                                     queue_size=1)
+        self.lsub = rospy.Subscriber('/proc_img',
+                                     Image,
+                                     self.callback2,
+                                     queue_size=1)
+        self.decisionsub = rospy.Subscriber('arm_img',
+                                            String,
+                                            self.callback3)
+        self.pub = rospy.Publisher('/robot/xdisplay', Image, queue_size=1)
+
+    def callback1(self, msg):
+        if self.arm == "right":
+            # print("publishing right arm")
+            self.pub.publish(msg)
+
+    def callback2(self, msg):
+        if self.arm == "left":
+            # print("publishing left arm")
+            self.pub.publish(msg)
+
+    def callback3(self, msg):
+        self.arm = msg
+        print(msg)
+
+
+def main():
+    rospy.init_node('head_screen_display', anonymous=True)
+    rospy.loginfo("Initialised")
+    display = Display()
+    rospy.spin()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except rospy.ROSInterruptException:
+        pass

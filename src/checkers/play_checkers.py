@@ -337,6 +337,7 @@ class Board():
         c = 0
         if isinstance(list,str):
             list = list.split(' ')
+<<<<<<< HEAD
         #print(list)
         try:
             for ele in list:
@@ -351,15 +352,38 @@ class Board():
                     state[r][c] = piece
                 else:
                     state[r][c] = ele
+=======
+        # print(list)
+        for ele in list:
+            # print('element: '+str(ele))
+            if isinstance(ele,str):
+                if ele == 'purple' or ele == 'black':
+                    piece = -1
+                elif ele == 'green' or ele == 'red':
+                    piece = 1
+                else:
+                    piece = 0
+                state[r][c] = piece
+                if c == 7:
+                    r += 1
+                    c = 0
+                else:
+                    c += 1
+            else:
+                state[r][c] = ele
+>>>>>>> master
                 #print(state)
                 if c == 7:
                     r += 1
                     c = 0
                 else:
                     c += 1
+<<<<<<< HEAD
         except IndexError:
             print('IndexError: length of input is '+str(len(list)))
             return
+=======
+>>>>>>> master
         #state = self.flip_board(state)
         if self.baxter_color == None:
             if state[-1][-2] == 1: #colors determined here !!

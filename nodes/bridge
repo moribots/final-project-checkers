@@ -19,6 +19,7 @@ class Vision():
         # Publish pose to Tcb topic
         self.pub = rospy.Publisher('Tcb', Pose, queue_size=1)
         self.pub2 = rospy.Publisher('Board_State', String, queue_size=1)
+        self.pub3 = rospy.Publisher('proc_img', Image, queue_size=1)
         self.single_picture_count = 0
 
     def rotate_matrix(self, mtx):
@@ -251,7 +252,7 @@ class Vision():
             for c in circles_red:
                 # compute the center of the contour
                 M = cv2.moments(c)
-                if cv2.contourArea(c) > 100:
+                if cv2.contourArea(c) > 50:
                     cX = int(M["m10"] / M["m00"])
                     cY = int(M["m01"] / M["m00"])
                     cv2.circle(frame, (cX, cY), 5, (0, 255, 255),-1)
@@ -285,7 +286,7 @@ class Vision():
             for c in circles_blue:
                 # compute the center of the contour
                 M = cv2.moments(c)
-                if cv2.contourArea(c) > 100:
+                if cv2.contourArea(c) > 50:
                     cX = int(M["m10"] / M["m00"])
                     cY = int(M["m01"] / M["m00"])
                     cv2.circle(frame, (cX, cY), 5, (255, 255, 255),-1)
@@ -363,22 +364,19 @@ class Vision():
                         point = (point[0][0], point[0][1])
                         frame = cv2.circle(frame, point, 2, (0,0,255),2)
             """
-        ##print ('board state')
-        ##print board_state
-        print ("\n")
-
-        print ('board state2')
-        print board_state2
-        print ("\n")
-
-        board_state3 = ''
-        for i in range(64):
-            board_state3 = board_state3 + ' ' + board_state2[i]
-        print('boardstate3')
-        print(board_state3)
-        self.pub2.publish(board_state3)
+            board_state3 = ''
+            for i in range(64):
+                if i == 0:
+                    board_state3 = board_state2[i]
+                else:
+                    board_state3 = board_state3 + ' ' + board_state2[i]
+            print('boardstate3')
+            print(board_state3)
+            self.pub2.publish(board_state3)
 
         cv2.imshow('frame', frame)
+        pubframe = self.bridge.cv2_to_imgmsg(frame, encoding="passthrough")
+        self.pub3.publish(pubframe)
         cv2.waitKey(1)
 
 
