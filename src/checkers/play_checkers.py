@@ -342,7 +342,7 @@ class Board():
         c = 0
         if isinstance(list,str):
             list = list.split(' ')
-        print(list)
+        # print(list)
         for ele in list:
             print('element: '+str(ele))
             if isinstance(ele,str):

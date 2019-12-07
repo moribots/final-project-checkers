@@ -58,7 +58,7 @@ class Client():
         self.chai = CheckersAI()
         rospy.loginfo("AI ready to defeat you!")
         # Enable Baxter
-        baxter_interface.robot_enable.RobotEnable()
+        baxter_interface.robot_enable.RobotEnable().enable()
         rospy.loginfo("Baxter Enabled!")
         # Initialise pick place client
         self.pp_client = actionlib.SimpleActionClient('pick_place_as',
@@ -76,6 +76,10 @@ class Client():
                                       String,
                                       self.callback_BS,
                                       queue_size=1)
+        # Image Display L/R Publisher
+        self.pub_lr = rospy.Publisher('arm_img', String)
+        # Show right arm image on screen at start
+        self.pub_lr.publish("right")
 
         # Board Dictionary from Bottom Right
         # Square width in meters
@@ -146,6 +150,8 @@ class Client():
             62: [self.SW * -0.5, self.SW * 0.5],
             63: [self.SW * -0.5, self.SW * -0.5]
         }
+        # Read Board State Counter
+        self.str_count = 0
         rospy.loginfo("======= Initialised =======")
 
     def feedback_pp(self, msg):
@@ -165,9 +171,7 @@ class Client():
 
                   Example: purple empty empty green ...
         """
-        if self.count == 0:
-            self.board_state = msg.data
-            self.count = 1
+        self.board_state = msg.data
 
 
 class SETUP(smach.State):
@@ -298,14 +302,18 @@ class WAIT(smach.State):
     """ Waits for the user to finish their turn
     """
     def __init__(self):
-        smach.State.__init__(self, outcomes=['play'])
+        smach.State.__init__(self, outcomes=['play', 'exit'])
 
     def execute(self, userdata):
         """ State Execution """
-        rospy.loginfo('Press Enter to end your turn')
-        raw_input()
-        # This will initiate the MYTURN State
-        return 'play'
+        rospy.loginfo('Press Enter to end your turn or press q to quit')
+        response = raw_input()
+        if response == "q":
+            # This will initiate the SHUTDOWN State
+            return 'exit'
+        else:
+            # This will initiate the MYTURN State
+            return 'play'
 
 
 class MYTURN(smach.State):
@@ -329,6 +337,7 @@ class MYTURN(smach.State):
 
         Returns: moves, list containing pick, place, and discard coordinates.
     """
+
     # Pass Client Object in State init
     def __init__(self, client):
         smach.State.__init__(self,
@@ -394,33 +403,36 @@ class MYTURN(smach.State):
         rospy.loginfo("Moving Camera to View")
         # Call AS to put camera at view position
         self.pp_goal(camera_view=True)
-        rospy.sleep(1)
+        # Show processed image on screen
+        self.client.pub_lr.publish("left")
+        rospy.sleep(5)
         rospy.loginfo('Reading board state')
         # Read board state and feed data to logic
         # SUBSCRIBE TO \Board_State and get board state
         # Read until valid board state (at least 2 pcs)
-        str_count = 0
-        while str_count < 2:
+        self.client.str_count = 0
+        while self.client.str_count < 2:
             # A single board state must have at least
             # two pieces
-            str_count = 0
-            self.count = 0
-            rospy.sleep(0.1)
             list_from_cam = self.client.board_state
             # Split string list into list using space
             str_check = list_from_cam.split(" ")
             # Increment str_count for each non-empty square
             for item in str_check:
+                # print(item)
                 if item != "empty":
-                    str_count += 1
+                    print("found one")
+                    self.client.str_count += 1
 
-        rospy.logdebug(list_from_cam)
+        rospy.loginfo(list_from_cam)
         move_list = self.client.chai.give_command(list_from_cam)
         rospy.logdebug(move_list)
         # Output moves to MOVE state
         userdata.moves = move_list
         # Call AS to put camera at home position
         self.pp_goal(camera_home=True)
+        # Show right arm image on screen
+        self.client.pub_lr.publish("right")
 
         # Call logic function to determine win/lose
         # end_game = self.client.chai.game_over
@@ -457,6 +469,7 @@ class MOVE(smach.State):
               [1]: place index, and [2:] the positions
               of captured pieces to discard
     """
+
     # Place Client Object in State init
     def __init__(self, client):
         smach.State.__init__(self,
@@ -522,27 +535,39 @@ class MOVE(smach.State):
         """ State Execution """
         # Call AS to perform pick-place
         moves = userdata.moves
-        # Pick and Place always 0 and 1
-        pick_index = moves[0]
-        place_index = moves[1]
-        # pick_index = 62
-        # place_index = 63
-        pick_goal = self.client.board_dict[pick_index]
-        place_goal = self.client.board_dict[place_index]
-        home = False
-        self.pp_goal(pick_goal, place_goal, home)
+        # Check that moves have been returned
+        if moves[0] is not None:
+            # Pick and Place always 0 and 1
+            pick_index = moves[0]
+            place_index = moves[1]
+            # pick_index = 62
+            # place_index = 63
+            pick_goal = self.client.board_dict[pick_index]
+            # x offset
+            if pick_index < 40:
+                x_ofst = 0
+            else:
+                x_ofst = 0
+                # x_ofst = 25e-3
+            pick_goal[0] += x_ofst
+            place_goal = self.client.board_dict[place_index]
+            place_goal[0] += x_ofst
+            home = False
+            self.pp_goal(pick_goal, place_goal, home)
 
-        # Call AS to perform pick-place per discard
-        # Pieces to discard start from 2
-        rospy.loginfo("MOVES")
-        rospy.loginfo(moves)
-        if len(moves) > 2:
-            for i in range(2, len(moves)):
-                discard_index = moves[i]
-                pick_goal = self.client.board_dict[discard_index]
-                place_goal = [0.3, -0.3]
-                home = False
-                self.pp_goal(pick_goal, place_goal, home)
+            # Call AS to perform pick-place per discard
+            # Pieces to discard start from 2
+            rospy.loginfo("MOVES {}".format(moves))
+            if len(moves) > 2:
+                for i in range(2, len(moves)):
+                    discard_index = moves[i]
+                    pick_goal = self.client.board_dict[discard_index]
+                    pick_goal[0] += x_ofst
+                    place_goal = [0.3, -0.3]
+                    home = False
+                    self.pp_goal(pick_goal, place_goal, home)
+        else:
+            rospy.logwarn("Did not receive a move. Returning arm to home")
 
         # Call AS to go home to clear board for camera
         self.pp_goal(home=True)
@@ -567,15 +592,18 @@ class MOVE(smach.State):
 
 
 class SHUTDOWN(smach.State):
-    """ Disables baxter and terminates the State Machine
+    """ Asks user to move Baxter's Arms to a safe spot
+        , disables baxter and terminates the State Machine
     """
     def __init__(self):
         smach.State.__init__(self, outcomes=['end'])
 
     def execute(self, userdata):
+        rospy.logwarn("Please put Baxter's Arms in a Safe Position")
+        raw_input()
         rospy.loginfo('Disabling Baxter...')
         # Disable Baxter
-        baxter_interface.robot_enable.RobotDisable()
+        baxter_interface.robot_enable.RobotEnable().disable()
         rospy.loginfo("Baxter Disabled!")
         # Terminate State Machine
         return 'end'
@@ -605,7 +633,12 @@ def main():
                                    'black': 'WAIT'
                                })
         # Wait State
-        smach.StateMachine.add('WAIT', WAIT(), transitions={'play': 'MYTURN'})
+        smach.StateMachine.add('WAIT',
+                               WAIT(),
+                               transitions={
+                                   'play': 'MYTURN',
+                                   'exit': 'SHUTDOWN'
+                               })
         # My Turn State
         smach.StateMachine.add('MYTURN',
                                MYTURN(client),
