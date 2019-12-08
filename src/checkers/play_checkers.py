@@ -142,7 +142,7 @@ class CheckersAI():
         if p == baxter and move[1][0] == 0 or p == not_bax and move[1][0] == 7 or state[move[0][0]][move[0][1]] == p*2:
             K = 2
             self.board.bax_king_list.append(move[1])
-            print(self.board.bax_king_list)
+            # print(self.board.bax_king_list)
         state[move[0][0]][move[0][1]] = 0
         state[move[1][0]][move[1][1]] = K*p #should still be the last players value
         captured = []
@@ -193,7 +193,7 @@ class CheckersAI():
         else:
             self.path = []
             bestvalue = self.prune(float('-inf'),float('+inf'),state,'max',0)
-            print('Best_value: '+str(bestvalue))
+            # print('Best_value: '+str(bestvalue))
             print(moves)
             exists = False
             for move in moves:
@@ -347,7 +347,7 @@ class Board():
         if isinstance(list,str):
             list = list.split(' ')
         king_move = 1
-        print(len(list))
+        # print(len(list))
         try:
             for ele in list:
                 # print('element: '+str(ele))
@@ -376,24 +376,24 @@ class Board():
                                     print('king_move')
                                     try:
                                         self.enemy_king_list.remove([r,c]) #the old index for the king is removed
-                                        print('enemy: '+str(self.enemy_king_list))
+                                        # print('enemy: '+str(self.enemy_king_list))
                                     except ValueError:
                                         print('ValueError, not on list')
 
                             if state[r][c] != 0 and state[r][c] == not_bax: #only humans piece should be moved.
                                 state[r][c] *= 2
                                 self.enemy_king_list.append([r,c]) #add new location of king to list
-                                print('king_move '+str(self.enemy_king_list))
+                                # print('king_move '+str(self.enemy_king_list))
 
 
 
                             for king in self.bax_king_list: #loop through baxter's kings
                                 if [r,c] in self.bax_king_list and state[r][c] != 0: #king on baxter's list, and is still there
                                     state[r][c] *= 2 # update value
-                                    print('baxters kings updated')
+                                    # print('baxters kings updated')
                                 elif [r,c] in self.bax_king_list and state[r][c] == 0: #if no longer there, jumped
                                     try:
-                                        print('remove king from baxters list')
+                                        # print('remove king from baxters list')
                                         self.bax_king_list.remove([r,c]) #remove from king list
                                     except ValueError:
                                         print('ValueError, not on list')
@@ -413,7 +413,7 @@ class Board():
                         c += 1
         except IndexError:
             print('IndexError: length of list is '+str(len(list)))
-        print(self.bax_king_list)
+        # print(self.bax_king_list)
         if self.baxter_color == None:
             if state[-1][-2] == 1: #colors determined here !!
                 self.baxter_color = 'red'
