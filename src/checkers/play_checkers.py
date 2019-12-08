@@ -294,7 +294,7 @@ class CheckersAI():
         '''Alpha beta pruning to optimize minimax''' #works, scoring needs work.
         val = 0
         self.is_game_over(node)
-        if self.game_over or level > 3: #return utility of the node if terminal node
+        if self.game_over or level > 9: #return utility of the node if terminal node
             if self.game_over == False:
 
                 if self.board.baxter_color == 'black':
