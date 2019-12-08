@@ -10,20 +10,30 @@ if __name__ == '__main__':
     If you double jump, put only the start position and the goal position after the double jump. \n')
 
         #  state list will come from CV
-    top_to_bottom = 'empty purple empty purple empty purple empty purple purple empty purple empty purple empty purple empty empty purple empty purple empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty green empty green empty green empty green empty empty green empty green empty green empty green green empty green empty green empty green empty' #<== baxters side
+    # top_to_bottom = 'empty purple empty purple empty purple empty purple purple empty purple empty purple empty purple empty empty purple empty purple empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty green empty green empty green empty green empty empty green empty green empty green empty green green empty green empty green empty green empty' #<== baxters side
+    ai = CheckersAI() #Initialize AI object
 
-    # top_to_bottom = 'empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty \
-    # empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty \
-    # empty empty green empty empty empty empty empty empty empty empty empty empty empty empty empty'
+    top_to_bottom = 'empty empty empty purple empty empty empty empty empty empty empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty green empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty'
 
+    '''ai.board.prev_state = [[ 0, 0,  0, -1,  0, 0,  0, 0],
+                           [0,  0,-1,  0, 0,  0, 0,  0],
+                           [ 0, 0,  0, 0,  0, 0,  0, 0],
+                           [ 0,  0,  0,  0,  0,  0,  0,  0],
+                           [ 0,  0,  0,  0,  0,  0,  0,  0],
+                           [ 0,  0,  0,  0,  0,  0,  0,  0],
+                           [ 0,  0,  0,  0,  0,  2,  0,  0],
+                           [ 0,  0,  0,  0,  0,  0,  0,  0]]'''
         # state = 'empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty green empty empty empty empty empty empty\
         # empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty green empty'
-        #
-    ai = CheckersAI() #Initialize AI object
-    ai.board.baxter_color = 'red'
-    ai.board.not_baxter = 'black'
-    # movelist = ai.give_command(top_to_bottom)
-    best_move_list = ai.minimax(top_to_bottom)
+    ai.board.enemy_king_list = [[6,5]]
+    print(ai.board.enemy_king_list)
+    ai.board.bax_king_list = []
+
+    ai.board.baxter_color = 'black'
+    ai.board.not_baxter = 'red'
+    print(np.array(ai.board.prev_state))
+    movelist = ai.give_command(top_to_bottom)
+    # best_move_list = ai.minimax(top_to_bottom)
     s  = 1
 
 

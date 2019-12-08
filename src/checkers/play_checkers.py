@@ -133,10 +133,16 @@ class CheckersAI():
         #print('moves: '+str(move))
         #print('captures: '+str(cap))
         K = 1
-        if p == 1 and move[1][0] == 0 or p == -1 and move[1][0] == 7 or state[move[0][0]][move[0][1]] == p*2:
+        if self.board.baxter_color == 'black':
+            baxter = -1
+            not_bax = 1
+        else:
+            baxter = 1
+            not_bax = -1
+        if p == baxter and move[1][0] == 0 or p == not_bax and move[1][0] == 7 or state[move[0][0]][move[0][1]] == p*2:
             K = 2
-            self.board.bax_king_list.append([p,move[1]])
-            print(self.board.king_list)
+            self.board.bax_king_list.append(move[1])
+            print(self.board.bax_king_list)
         state[move[0][0]][move[0][1]] = 0
         state[move[1][0]][move[1][1]] = K*p #should still be the last players value
         captured = []
@@ -312,16 +318,6 @@ class Board():
         #self.init_state = state
         #self.state = state
 
-    # def flip_board(self,state):
-    #     '''Args:
-    #          state: a array representation of a board state.
-    #        Returns:
-    #          flip_state: the same board with the first index corresponding to the corner diagonally opposite.
-    #         Flips the board so the board is in the perspective of whichever players turn it is'''
-    #     flip_state = state[::-1]
-    #     #for l in range(len(flip_state)): #this loop assumes baxter is dark
-    #     #    flip_state[l] = flip_state[l][::-1]
-    #     return flip_state
 
     def get_piece_count(self,state):
         self.red_piece_count = 0
@@ -362,7 +358,7 @@ class Board():
                     else:
                         piece = 0
                     state[r][c] = piece
-                    print(state)
+                    # print(state)
 
                     if self.prev_state != None:
                         if self.baxter_color == 'black':
@@ -371,37 +367,35 @@ class Board():
                         else:
                             baxter = 1
                             not_bax = -1
-                        if state[r][c] != self.prev_state[r][c]:
-                            for king in self.enemy_king_list:
-                                if state[r][c] == 0 and king[1] == [r,c]:
-                                    king_move == True
-                                if king[1] == [r,c]: #and king[0] = baxter: #if the now empty space is on the king lis
-                                    state[r][c] *= 2
-                                    if king[0] == baxter: #baxter's kings is taken
-                                        pass
-                                        #remove king from king list.
-                                if state[r][c] != 0: #only humans piece should be moved.
-                                    if r == 7 and not king_move: #not on king list yet
-                                        state[r][c] = 2*state[r][c]
-                                        self.king_list.append([not_bax,[r,c]])
-                                    else:
-                                        index = [r,c]
-                                        print(index[0])
-                            # if state[r][c] != 0 and state[r][c] != baxter and r == 7:
-                             #if the space is now empty
-                                # for king in self.king_list:
-                                    # if : #if the now empty space is on the king list
+                        if state[r][c] != self.prev_state[r][c]: #board state changed
+                            for king in self.enemy_king_list: #loop through enemy kings
 
-                            elif state[r][c] != 0: #only humans piece should be moved.
-                                if r == 7 and not king_move: #not on king list yet
-                                    state[r][c] = 2*state[r][c]
-                                    self.king_list.append([not_bax,[r,c]])
-                                else:
-                                    index = [r,c]
-                                    print(index[0])
-                        # else: #baxter's pieces havent changed, and other kings might not have changed, so any index on the king list should be multiplied by 2
+                                if state[r][c] == 0 and king == [r,c]: #if a king is no longer where it was
+                                    king_move == True # we know its a king's move
+                                    print('king_move')
+                                    try:
+                                        self.enemy_king_list.remove([r,c]) #the old index for the king is removed
+                                        print('enemy: '+str(self.enemy_king_list))
+                                    except ValueError:
+                                        print('ValueError, not on list')
+
+                            if state[r][c] != 0 and state[r][c] == not_bax: #only humans piece should be moved.
+                                state[r][c] *= 2
+                                self.enemy_king_list.append([r,c]) #add new location of king to list
+                                print('king_move '+str(self.enemy_king_list))
 
 
+
+                            for king in self.bax_king_list: #loop through baxter's kings
+                                if [r,c] in self.bax_king_list and state[r][c] != 0: #king on baxter's list, and is still there
+                                    state[r][c] *= 2 # update value
+                                    print('baxters kings updated')
+                                elif [r,c] in self.bax_king_list and state[r][c] == 0: #if no longer there, jumped
+                                    try:
+                                        print('remove king from baxters list')
+                                        self.bax_king_list.remove([r,c]) #remove from king list
+                                    except ValueError:
+                                        print('ValueError, not on list')
 
 
                     if c == 7:
@@ -418,9 +412,7 @@ class Board():
                         c += 1
         except IndexError:
             print('IndexError: length of list is '+str(len(list)))
-        if king_move:
-            state[index[0]][index[1]] *= 2
-        print(self.king_list)
+        print(self.bax_king_list)
         if self.baxter_color == None:
             if state[-1][-2] == 1: #colors determined here !!
                 self.baxter_color = 'red'
