@@ -190,15 +190,16 @@ class CheckersAI():
         best_move = []
         moves,cap,p = self.board.get_moves(state,self.board.baxter_color)
         # print(moves)
-        self.val_list = []
+        # self.val_list = []
         if len(moves) == 1: return self.grid_to_world(moves[0],cap) #captured moves are forced
         else:
             self.path = []
-            # bestvalue = self.prune(float('-inf'),float('+inf'),state,'max',0)
-            bestvalue = self.basic_search(state,'max',0)
+            bestvalue = self.prune(float('-inf'),float('+inf'),state,'max',0)
+            # bestvalue = self.basic_search(state,'min',0)
             print('Best_value: '+str(bestvalue))
-            print(moves)
+            # print(moves)
             exists = False
+            # print(self.path)
             for move in moves:
                 for step in self.path:
                     if step[0] == move and step[1] >= bestvalue:
@@ -207,8 +208,9 @@ class CheckersAI():
                                 exists = True
                         if not exists:
                             best_move.append(move)
-            print('Best move: '+str(best_move))
+            print('Best move: '+str(len(best_move)))
             i = 0
+
             if len(best_move) > 1:
                 i = np.random.randint(0,len(best_move))
             picked_best = best_move[i]
@@ -217,11 +219,11 @@ class CheckersAI():
             self.board.prev_state = after[0]
             print('playing picked move')
             print(np.array(after[0]))
-            print(self.val_list)
+            # print(self.val_list)
             return self.grid_to_world(picked_best,cap) #cap should be None
 
 
-    def basic_search(self,node,is_max,level):
+    def basic_search(self,node,is_max,level): #Minimax with no optimization (alpha beta pruning). works, but scoreing needs work
         val = 0
         self.is_game_over(node)
         if self.game_over or level > 4: #return utility of the node if terminal node
@@ -251,8 +253,10 @@ class CheckersAI():
                 child,captured = self.make_move(move,cap,init_state,p,is_ai=True)
                 print('child:\n '+str(np.array(child)))
                 evaluate = self.basic_search(child,'min',level+1)
-                print("Utility of Max's child node: "+str(evaluate))
+                print("Utility of Max's child node: "+str(evaluate)+" vs. current Max value: "+str(max_v))
                 max_v = max(max_v,evaluate)
+                print('Updated Max Value: '+str(max_v))
+
                 self.path.append([move,max_v])
                 '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
                 init_state = self.undo_move(move,cap,captured,child,p)
@@ -260,7 +264,7 @@ class CheckersAI():
                 self.winner = None
 
             # print('returning val (max): '+str(max_v))
-            self.val_list.append(['Max level: '+str(level),max_v])
+            # self.val_list.append(['Max level: '+str(level),max_v])
             return max_v #return maximum of all children
 
         else: #minimizing player
@@ -274,28 +278,29 @@ class CheckersAI():
                 child,captured = self.make_move(move,cap,init_state,p,is_ai=True)
                 print('child:\n '+str(np.array(child)))
                 evaluate = self.basic_search(child,'max',level+1)
-                print("Utility of Min's child node: "+str(evaluate))
+                print("Utility of Min's child node: "+str(evaluate)+" vs. current Min value: "+str(min_v))
                 min_v = min(min_v,evaluate)
+                print('Updated Min Value: '+str(min_v))
                 '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
                 init_state = self.undo_move(move,cap,captured,child,p)
                 self.game_over = False
                 self.winner = None
             # print('returning val (max): '+str(min_v))
-            self.val_list.append(['Min level: '+str(level),min_v])
+            # self.val_list.append(['Min level: '+str(level),min_v])
             return min_v #return minimum of all children
 
 
     def prune(self,alpha,beta,node,is_max,level): #based on pseudocode from https://www.hackerearth.com/blog/developers/minimax-algorithm-alpha-beta-pruning/
-        '''Alpha beta pruning to optimize minimax'''
+        '''Alpha beta pruning to optimize minimax''' #works, scoring needs work.
         val = 0
         self.is_game_over(node)
-        if self.game_over or level > 9: #return utility of the node if terminal node
+        if self.game_over or level > 3: #return utility of the node if terminal node
             if self.game_over == False:
 
                 if self.board.baxter_color == 'black':
-                    val = self.board.black_total - self.board.red_total
+                    val = 4*(self.board.black_total - self.board.red_total)
                 else:
-                    val = self.board.red_total - self.board.black_total
+                    val = 4*(self.board.red_total - self.board.black_total)
                 # else:
                 #     if self.board.baxter_color == 'black':
                 #         val = -self.board.black_total# - self.board.red_total
@@ -305,9 +310,9 @@ class CheckersAI():
                 print('GAMEOVER')
                 if self.winner == 'baxter': #returns count of baxter's pieces
                     if self.board.baxter_color == 'black':
-                        val = self.board.black_total - self.board.red_total
+                        val = 4*(self.board.black_total - self.board.red_total)
                     else:
-                        val = self.board.red_total - self.board.black_total
+                        val = 4*(self.board.red_total - self.board.black_total)
                 # elif self.winner == 'not_baxter': #return the count of not baxter's pieces
                 #     if self.board.not_baxter == 'black':
                 #         val = -self.board.black_total
@@ -331,10 +336,16 @@ class CheckersAI():
                 count += 1
                 # print('Max next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
                 child,captured = self.make_move(move,cap,init_state,p)
+                # print('child:\n '+str(np.array(child)))
                 evaluate = self.prune(alpha,beta,child,'min',level+1)
-                # print("Utility of Max's child node: "+str(evaluate))
+                # print("Utility of Max's child node: "+str(evaluate)+" vs. current Max value: "+str(max_v))
+
                 max_v = max(max_v,evaluate)
+                # print('Updated Max Value: '+str(max_v))
+                # print('current Alpha: '+str(alpha))
                 alpha = max(alpha,evaluate)
+                # print('Updated Alpha: '+str(alpha))
+
                 self.path.append([move,max_v])
 
                 '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
@@ -344,7 +355,6 @@ class CheckersAI():
                 if beta <= alpha: #don't update alpha and prune if its greater than beta
                     # print('Prune the rest of level '+str(level))
                     break
-            # print('returning val (max): '+str(max_v))
             return max_v #return maximum of all children
 
         else: #minimizing player
@@ -358,9 +368,13 @@ class CheckersAI():
                 child,captured = self.make_move(move,cap,init_state,p)
                 # print('child:\n '+str(np.array(child)))
                 evaluate = self.prune(alpha,beta,child,'max',level+1)
-                # print("Utility of Min's child node: "+str(evaluate))
+                # print("Utility of Min's child node: "+str(evaluate)+" vs. current Min value: "+str(min_v))
                 min_v = min(min_v,evaluate)
+                # print('Updated Min Value: '+str(min_v))
+                # print('current Beta: '+str(beta))
                 beta = min(beta,evaluate)
+                # print('Updated Beta: '+str(beta))
+
                 '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
                 init_state = self.undo_move(move,cap,captured,child,p)
                 self.game_over = False
@@ -369,7 +383,6 @@ class CheckersAI():
                 if beta <= alpha: #don't update alpha and prune if its greater than beta
                     # print('Prune the rest of level '+str(level))
                     break
-            # print('returning val (max): '+str(min_v))
             return min_v #return minimum of all children
 
 
