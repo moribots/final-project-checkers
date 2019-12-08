@@ -16,7 +16,7 @@ from std_msgs.msg import String
 
 class Display(object):
     def __init__(self):
-        self.arm = "left"
+        self.arm = "right"
         self.rsub = rospy.Subscriber('/cameras/right_hand_camera/image',
                                      Image,
                                      self.callback1,
@@ -25,10 +25,10 @@ class Display(object):
                                      Image,
                                      self.callback2,
                                      queue_size=1)
-        self.decisionsub = rospy.Subscriber('arm_img',
+        self.decisionsub = rospy.Subscriber('/arm_img',
                                             String,
-                                            self.callback3)
-        self.pub = rospy.Publisher('/robot/xdisplay', Image, queue_size=1)
+                                            self.callback3, queue_size=1)
+        self.pub = rospy.Publisher('/robot/xdisplay', Image, queue_size=10)
 
     def callback1(self, msg):
         if self.arm == "right":
@@ -41,8 +41,8 @@ class Display(object):
             self.pub.publish(msg)
 
     def callback3(self, msg):
-        self.arm = msg
-        print(msg)
+        self.arm = msg.data
+        # print(self.arm)
 
 
 def main():

@@ -69,17 +69,8 @@ class Client():
         # Initialise goal msg
         self.pp_goal = PickPlaceGoal()
 
-        # Board State Subscriber
-        self.count = 0
-        self.board_state = ""
-        self.subBS = rospy.Subscriber('Board_State',
-                                      String,
-                                      self.callback_BS,
-                                      queue_size=1)
         # Image Display L/R Publisher
-        self.pub_lr = rospy.Publisher('arm_img', String)
-        # Show right arm image on screen at start
-        self.pub_lr.publish("right")
+        self.pub_lr = rospy.Publisher('/arm_img', String, queue_size=1)
 
         # Board Dictionary from Bottom Right
         # Square width in meters
@@ -157,21 +148,6 @@ class Client():
     def feedback_pp(self, msg):
         # Print feedback from pick_place_as
         rospy.loginfo("Completed Moves: {}".format(msg))
-
-    def callback_BS(self, msg):
-        """ 'Board_State' subscriber callback
-            self.board_state is only updated when
-            self.count is set to zero, i.e when a board
-            state update is requested.
-
-            Args: msg, a String message containig
-                  the board state per square as
-                  separated by spaces in row-major
-                  order.
-
-                  Example: purple empty empty green ...
-        """
-        self.board_state = msg.data
 
 
 class SETUP(smach.State):
@@ -255,6 +231,15 @@ class SETUP(smach.State):
         rospy.sleep(1)
         # Return camera home
         self.setup_goal(camera_home=True)
+        rospy.sleep(1)
+        # Calibrate board opp corner
+        pick_goal = self.client.board_dict[0]
+        place_goal = self.client.board_dict[0]
+        self.setup_goal(pick_goal=pick_goal, place_goal=place_goal)
+        rospy.loginfo("Hit enter when board is aligned with the right arm.")
+        raw_input()
+        # Make sure pp arm at home
+        self.setup_goal(home=True)
         rospy.loginfo('Hit enter when you are ready to play.')
         raw_input()
         rospy.loginfo("======= Calibrated =======")
@@ -404,8 +389,12 @@ class MYTURN(smach.State):
         # Call AS to put camera at view position
         self.pp_goal(camera_view=True)
         # Show processed image on screen
+        # Wait until topic read to publish
+        num_com = 0
+        while num_com < 1:
+            num_com = self.client.pub_lr.get_num_connections()
         self.client.pub_lr.publish("left")
-        rospy.sleep(5)
+        rospy.sleep(2)
         rospy.loginfo('Reading board state')
         # Read board state and feed data to logic
         # SUBSCRIBE TO \Board_State and get board state
@@ -414,38 +403,56 @@ class MYTURN(smach.State):
         while self.client.str_count < 2:
             # A single board state must have at least
             # two pieces
-            list_from_cam = self.client.board_state
+            """ 'Board_State' subscriber ONESHOT
+            self.board_state is only updated when
+            self.count is set to zero, i.e when a board
+            state update is requested.
+
+            Args: msg, a String message containig
+                  the board state per square as
+                  separated by spaces in row-major
+                  order.
+
+                  Example: purple empty empty green ...
+            """
+            list_from_cam = rospy.wait_for_message('/Board_State', String).data
             # Split string list into list using space
             str_check = list_from_cam.split(" ")
             # Increment str_count for each non-empty square
             for item in str_check:
                 # print(item)
                 if item != "empty":
-                    print("found one")
+                    # print("found one")
                     self.client.str_count += 1
 
         rospy.logdebug(list_from_cam)
-        move_list = self.client.chai.give_command(list_from_cam)
+        rospy.loginfo("Use AI? (y/n)")
+        ai = raw_input()
+        if ai == "y":
+            move_list = self.client.chai.minimax(list_from_cam)
+        else:
+            move_list = self.client.chai.give_command(list_from_cam)
         rospy.logdebug(move_list)
         # Output moves to MOVE state
         userdata.moves = move_list
         # Call AS to put camera at home position
         self.pp_goal(camera_home=True)
         # Show right arm image on screen
+        num_com = 0
+        while num_com < 1:
+            num_com = self.client.pub_lr.get_num_connections()
         self.client.pub_lr.publish("right")
 
         # Call logic function to determine win/lose
-        # end_game = self.client.chai.game_over
-        # winner = self.client.chai.winner
-        end_game = False
-        status = "win"
+        end_game = self.client.chai.game_over
+        winner = self.client.chai.winner
         if end_game is True:
-            if status == "win":
-                rospy.loginfo("I win!")
-            elif status == "draw":
+            if winner == "baxter":
+                rospy.loginfo("Baxter wins!")
+            elif winner == "draw":
                 rospy.loginfo("Draw!")
-            elif status == "lose":
-                rospy.loginfo("You win!")
+            elif winner == "not_baxter":
+                rospy.loginfo("Human wins!")
             # This will initiate the SHUTDOWN State
             return 'exit'
         else:
@@ -544,14 +551,17 @@ class MOVE(smach.State):
             # place_index = 63
             pick_goal = self.client.board_dict[pick_index]
             # x offset
-            if pick_index < 40:
-                x_ofst = 0
-            else:
-                x_ofst = 0
-                # x_ofst = 25e-3
+            # if pick_index < 40:
+            #     y_ofst = 0
+            # else:
+            #     y_ofst = 0
+            x_ofst = 0  # 25e-3 / 3
+            y_ofst = 0  # 25e-3 / 2
             pick_goal[0] += x_ofst
+            pick_goal[1] += y_ofst
             place_goal = self.client.board_dict[place_index]
             place_goal[0] += x_ofst
+            place_goal[1] += y_ofst
             home = False
             self.pp_goal(pick_goal, place_goal, home)
 
@@ -563,6 +573,7 @@ class MOVE(smach.State):
                     discard_index = moves[i]
                     pick_goal = self.client.board_dict[discard_index]
                     pick_goal[0] += x_ofst
+                    pick_goal[1] += y_ofst
                     place_goal = [0.3, -0.3]
                     home = False
                     self.pp_goal(pick_goal, place_goal, home)
@@ -573,21 +584,19 @@ class MOVE(smach.State):
         self.pp_goal(home=True)
 
         # Call logic function to determine win/lose
-        # end_game = self.client.chai.game_over
-        # winner = self.client.chai.winner
-        end_game = False
-        status = "win"
+        end_game = self.client.chai.game_over
+        winner = self.client.chai.winner
         if end_game is True:
-            if status == "win":
-                rospy.loginfo("I win!")
-            elif status == "draw":
+            if winner == "baxter":
+                rospy.loginfo("Baxter wins!")
+            elif winner == "draw":
                 rospy.loginfo("Draw!")
-            elif status == "lose":
-                rospy.loginfo("You win!")
+            elif winner == "not_baxter":
+                rospy.loginfo("Human wins!")
             # This will initiate the SHUTDOWN State
             return 'exit'
         else:
-            # This will initiate the WAIT State
+            # This will initiate the MOVE State
             return 'wait'
 
 
