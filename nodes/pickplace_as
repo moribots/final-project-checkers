@@ -360,7 +360,11 @@ class PickPlace():
         # GRASP GOAL
         rospy.loginfo("================== Grasp ==============")
         # Pass the goal and the grasp z coordinate
-        path_type = self.create_path(goal, self.z, only_z=True)
+        # If calibrating, put gripper slightly above board
+        if cal is True:
+            path_type = self.create_path(goal, self.z + 0.05, only_z=True)
+        else:
+            path_type = self.create_path(goal, self.z, only_z=True)
         if path_type == "pose":
             comp_count += 1
 

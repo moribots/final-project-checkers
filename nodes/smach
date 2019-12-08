@@ -426,7 +426,12 @@ class MYTURN(smach.State):
                     self.client.str_count += 1
 
         rospy.logdebug(list_from_cam)
-        move_list = self.client.chai.give_command(list_from_cam)
+        rospy.loginfo("Use AI? (y/n)")
+        ai = raw_input()
+        if ai == "y":
+            move_list = self.client.chai.minimax(list_from_cam)
+        else:
+            move_list = self.client.chai.give_command(list_from_cam)
         rospy.logdebug(move_list)
         # Output moves to MOVE state
         userdata.moves = move_list
@@ -439,17 +444,15 @@ class MYTURN(smach.State):
         self.client.pub_lr.publish("right")
 
         # Call logic function to determine win/lose
-        # end_game = self.client.chai.game_over
-        # winner = self.client.chai.winner
-        end_game = False
-        status = "win"
+        end_game = self.client.chai.game_over
+        winner = self.client.chai.winner
         if end_game is True:
-            if status == "win":
-                rospy.loginfo("I win!")
-            elif status == "draw":
+            if winner == "baxter":
+                rospy.loginfo("Baxter wins!")
+            elif winner == "draw":
                 rospy.loginfo("Draw!")
-            elif status == "lose":
-                rospy.loginfo("You win!")
+            elif winner == "not_baxter":
+                rospy.loginfo("Human wins!")
             # This will initiate the SHUTDOWN State
             return 'exit'
         else:
@@ -581,21 +584,19 @@ class MOVE(smach.State):
         self.pp_goal(home=True)
 
         # Call logic function to determine win/lose
-        # end_game = self.client.chai.game_over
-        # winner = self.client.chai.winner
-        end_game = False
-        status = "win"
+        end_game = self.client.chai.game_over
+        winner = self.client.chai.winner
         if end_game is True:
-            if status == "win":
-                rospy.loginfo("I win!")
-            elif status == "draw":
+            if winner == "baxter":
+                rospy.loginfo("Baxter wins!")
+            elif winner == "draw":
                 rospy.loginfo("Draw!")
-            elif status == "lose":
-                rospy.loginfo("You win!")
+            elif winner == "not_baxter":
+                rospy.loginfo("Human wins!")
             # This will initiate the SHUTDOWN State
             return 'exit'
         else:
-            # This will initiate the WAIT State
+            # This will initiate the MOVE State
             return 'wait'
 
 
