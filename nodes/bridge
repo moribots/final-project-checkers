@@ -287,10 +287,15 @@ class Vision():
             print('boardstate3')
             print(board_state3)
             self.pub2.publish(board_state3)
+            cropframe = frame[300:650, 350:945]
+            cropframe = cv2.resize(cropframe, (1024, 600))
+            pubframe = self.bridge.cv2_to_imgmsg(cropframe, encoding="passthrough")
+            num_com = 0
+            while num_com < 1:
+                num_com = self.pub3.get_num_connections()
+            self.pub3.publish(pubframe)
 
         cv2.imshow('frame', frame)
-        pubframe = self.bridge.cv2_to_imgmsg(frame, encoding="passthrough")
-        self.pub3.publish(pubframe)
         cv2.waitKey(1)
 
 if __name__ == '__main__':

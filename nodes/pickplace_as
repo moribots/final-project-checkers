@@ -684,13 +684,13 @@ class PickPlace():
             result.status = "calibrated"
         # Move Camera to View Position
         elif goal.camera_view is True:
-            j0 = -1.25  # -0.79
-            j1 = -0.57  # -0.64
-            j2 = -1.67  # -1.22
-            j3 = -0.05  # 0.73
-            j4 = 1.76  # 0.95
-            j5 = 2.09  # 1.835
-            j6 = -0.44  # -0.75
+            j0 = -0.813  # -0.79
+            j1 = -0.717  # -0.64
+            j2 = -1.456  # -1.22
+            j3 = 0.711  # 0.73
+            j4 = 1.044  # 0.95
+            j5 = 1.951  # 1.835
+            j6 = -0.85  # -0.75
             self.left_gripper.open()
             self.cam_joint_state(j0, j1, j2, j3, j4, j5, j6)
             result.status = "view"
