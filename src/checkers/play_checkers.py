@@ -203,12 +203,9 @@ class CheckersAI():
             for move in moves:
                 for step in self.path:
                     if step[0] == move and step[1] >= bestvalue:
-                        for move in best_move:
-                            if step[0] == move:
-                                exists = True
-                        if not exists:
-                            best_move.append(move)
-            print('Best move: '+str(len(best_move)))
+                        if step[0] not in best_move:
+                            best_move.append(step[0])
+            print('Best move: '+str(best_move))
             i = 0
 
             if len(best_move) > 1:
@@ -234,7 +231,7 @@ class CheckersAI():
                 else:
                     val = 4*(self.board.red_total - self.board.black_total)
             else:
-                print('GAMEOVER')
+                # print('GAMEOVER')
                 if self.winner == 'baxter': #returns count of baxter's pieces
                     if self.board.baxter_color == 'black':
                         val = 4*(self.board.black_total - self.board.red_total)
@@ -307,7 +304,7 @@ class CheckersAI():
                 #     else:
                 #         val = -self.board.red_total# - self.board.black_total
             else:
-                print('GAMEOVER')
+                # print('GAMEOVER')
                 if self.winner == 'baxter': #returns count of baxter's pieces
                     if self.board.baxter_color == 'black':
                         val = 4*(self.board.black_total - self.board.red_total)
@@ -335,7 +332,7 @@ class CheckersAI():
                 # print('Alpha: '+str(alpha))
                 count += 1
                 # print('Max next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
-                child,captured = self.make_move(move,cap,init_state,p)
+                child,captured = self.make_move(move,cap,init_state,p,is_ai=True)
                 # print('child:\n '+str(np.array(child)))
                 evaluate = self.prune(alpha,beta,child,'min',level+1)
                 # print("Utility of Max's child node: "+str(evaluate)+" vs. current Max value: "+str(max_v))
@@ -365,7 +362,7 @@ class CheckersAI():
             for move in moves:
                 count += 1
                 # print('Min next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
-                child,captured = self.make_move(move,cap,init_state,p)
+                child,captured = self.make_move(move,cap,init_state,p,is_ai=True)
                 # print('child:\n '+str(np.array(child)))
                 evaluate = self.prune(alpha,beta,child,'max',level+1)
                 # print("Utility of Min's child node: "+str(evaluate)+" vs. current Min value: "+str(min_v))
