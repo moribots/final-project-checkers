@@ -426,7 +426,7 @@ class Board():
         if isinstance(list,str):
             list = list.split(' ')
         king_move = 1
-        print(len(list))
+        # print(len(list))
         try:
             for ele in list:
                 # print('element: '+str(ele))
@@ -455,24 +455,24 @@ class Board():
                                     print('king_move')
                                     try:
                                         self.enemy_king_list.remove([r,c]) #the old index for the king is removed
-                                        print('enemy: '+str(self.enemy_king_list))
+                                        # print('enemy: '+str(self.enemy_king_list))
                                     except ValueError:
                                         print('ValueError, not on list')
 
                             if state[r][c] != 0 and state[r][c] == not_bax: #only humans piece should be moved.
                                 state[r][c] *= 2
                                 self.enemy_king_list.append([r,c]) #add new location of king to list
-                                print('king_move '+str(self.enemy_king_list))
+                                # print('king_move '+str(self.enemy_king_list))
 
 
 
                             for king in self.bax_king_list: #loop through baxter's kings
                                 if [r,c] in self.bax_king_list and state[r][c] != 0: #king on baxter's list, and is still there
                                     state[r][c] *= 2 # update value
-                                    print('baxters kings updated')
+                                    # print('baxters kings updated')
                                 elif [r,c] in self.bax_king_list and state[r][c] == 0: #if no longer there, jumped
                                     try:
-                                        print('remove king from baxters list')
+                                        # print('remove king from baxters list')
                                         self.bax_king_list.remove([r,c]) #remove from king list
                                     except ValueError:
                                         print('ValueError, not on list')
@@ -492,7 +492,7 @@ class Board():
                         c += 1
         except IndexError:
             print('IndexError: length of list is '+str(len(list)))
-        print(self.bax_king_list)
+        # print(self.bax_king_list)
         if self.baxter_color == None:
             if state[-1][-2] == 1: #colors determined here !!
                 self.baxter_color = 'red'

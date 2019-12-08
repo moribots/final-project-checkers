@@ -170,7 +170,9 @@ install(PROGRAMS
    nodes/get_baxter_move
    nodes/moveit_motion_plan
    nodes/pickplace_as
+   nodes/screen
    nodes/smach
+   nodes/take_turn
    nodes/vision
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

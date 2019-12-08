@@ -299,7 +299,7 @@ class Vision():
         cv2.waitKey(1)
 
 if __name__ == '__main__':
-    rospy.init_node('Camera_Subscriber', anonymous=True)  # Initialze ROS node
+    rospy.init_node('bridge', anonymous=True)  # Initialze ROS node
     vision = Vision()
     rospy.spin()  # sleep
     cv2.destroyAllWindows()  # Destroy CV image window on shut_down

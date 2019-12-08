@@ -1,22 +1,23 @@
 <launch>
   <!-- Start the baxter interface package -->
     <node name="joint_trajectory_action_server" pkg="baxter_interface" type="joint_trajectory_action_server.py" />
-
     <include file="$(find baxter_moveit_config)/launch/baxter_grippers.launch"/>
-  <!-- pick place action server -->
+  
+  <!-- Pick Place Action Server: ideally rosrun in separate terminal -->
     <!-- <node name="pickplace_as" pkg="checkers" type="pickplace_as" output="screen" /> -->
-    <!-- <node name="moveit_motion_plan" pkg="checkers" type="moveit_motion_plan" output="screen" /> -->
 
-  <!-- State Machine -->
+  <!-- State Machine: ideally rosrun in separate terminal -->
   <!-- <node name="smach" pkg="checkers" type="smach" output="screen" /> -->
 
-  <!-- Camera Setup -->
-  <!-- First, close head camera because only 2 cams can be open at once-->
-  <!-- Now open hand cameras -->
-  <node pkg="baxter_tools" type="camera_control.py" name="camera_l" args="-o left_hand_camera -r 1280x800"/>
-  <node pkg="baxter_tools" type="camera_control.py" name="camera_r" args="-o right_hand_camera -r 1280x800"/>
+  <!-- Computer Vision -->
+  	<node name="bridge" pkg="checkers" type="bridge" />
 
-  <!-- <node name="headscreen_display" pkg="checkers" type="screen" /> -->
+  <!-- Camera Setup -->
+  	<node pkg="baxter_tools" type="camera_control.py" name="camera_l" args="-o left_hand_camera -r 1280x800"/>
+  	<node pkg="baxter_tools" type="camera_control.py" name="camera_r" args="-o right_hand_camera -r 1280x800"/>
+
+  <!-- Screen Display -->
+  	<node name="headscreen_display" pkg="checkers" type="screen" />
 
 
 

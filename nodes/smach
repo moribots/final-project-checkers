@@ -394,7 +394,7 @@ class MYTURN(smach.State):
         while num_com < 1:
             num_com = self.client.pub_lr.get_num_connections()
         self.client.pub_lr.publish("left")
-        rospy.sleep(2)
+        # rospy.sleep(2)
         rospy.loginfo('Reading board state')
         # Read board state and feed data to logic
         # SUBSCRIBE TO \Board_State and get board state

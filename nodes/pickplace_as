@@ -331,13 +331,23 @@ class PickPlace():
         # GO TO HOME
         rospy.loginfo("================== Home ==============")
         # Go to pick_place home config
-        j0 = 0.09395632325798159
-        j1 = 0.31
-        j2 = 1.23
-        j3 = 2.43
-        j4 = 1.08
-        j5 = -1.57
-        j6 = 0.233
+        # y below -0.15
+        if goal[1] < -0.11:
+            j0 = -0.78
+            j1 = 0.264
+            j2 = 1.071
+            j3 = 2.414
+            j4 = 0.971
+            j5 = -1.48
+            j6 = 0.953
+        else:
+            j0 = 0.09395632325798159
+            j1 = 0.31
+            j2 = 1.23
+            j3 = 2.43
+            j4 = 1.08
+            j5 = -1.57
+            j6 = 0.233
         # SMALL TABLE
         # j0 = 0.09395632325798159 j1 = 0.4088058799714628 j2 = 1.313087554429914 j3 = 1.9941750242510379 j4 = 1.0657331523833913 j5 = -1.5274613695369008 j6 = 1.3652429012180183
         self.go_to_joint_state(j0, j1, j2, j3, j4, j5, j6)
@@ -362,7 +372,7 @@ class PickPlace():
         # Pass the goal and the grasp z coordinate
         # If calibrating, put gripper slightly above board
         if cal is True:
-            path_type = self.create_path(goal, self.z + 0.05, only_z=True)
+            path_type = self.create_path(goal, self.z + 0.02, only_z=True)
         else:
             path_type = self.create_path(goal, self.z, only_z=True)
         if path_type == "pose":
@@ -442,7 +452,11 @@ class PickPlace():
         # RELEASE GOAL
         rospy.loginfo("================== Release ==============")
         # Pass the goal and the release z coordinate
-        path_type = self.create_path(goal, self.z, only_z=True)
+        if goal[1] < -0.3 + self.psc[1]:
+            # discard condition
+            path_type = self.create_path(goal, self.z + 0.05, only_z=True)
+        else:
+            path_type = self.create_path(goal, self.z, only_z=True)
         if path_type == "pose":
             comp_count += 1
 
