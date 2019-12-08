@@ -125,7 +125,7 @@ class CheckersAI():
         print('Move list: '+str(movelist))
         return movelist
 
-    def make_move(self,move,cap,state,p):
+    def make_move(self,move,cap,state,p,is_ai=False):
         '''make a array of board states (nodes) after all legal moves starting from current state. include whether or not the node is terminal'''
         if len(state) > 8:
             #print('world_to_grid')
@@ -141,10 +141,11 @@ class CheckersAI():
             not_bax = -1
         if p == baxter and move[1][0] == 0 or p == not_bax and move[1][0] == 7 or state[move[0][0]][move[0][1]] == p*2:
             K = 2
-            self.board.bax_king_list.append(move[1])
-            print(self.board.bax_king_list)
+            if not is_ai: #only update the actual move, not during minimax
+                self.board.bax_king_list.append(move[1])
+                print(self.board.bax_king_list)
         state[move[0][0]][move[0][1]] = 0
-        state[move[1][0]][move[1][1]] = K*p #should still be the last players value
+        state[move[1][0]][move[1][1]] = K*p
         captured = []
         if len(cap) != 0 and cap[0][0] == move[0]:
             for piece in cap:
@@ -188,11 +189,13 @@ class CheckersAI():
         state = self.board.world_to_grid(state_list)
         best_move = []
         moves,cap,p = self.board.get_moves(state,self.board.baxter_color)
-        print(moves)
+        # print(moves)
+        self.val_list = []
         if len(moves) == 1: return self.grid_to_world(moves[0],cap) #captured moves are forced
         else:
             self.path = []
-            bestvalue = self.prune(float('-inf'),float('+inf'),state,'max',0)
+            # bestvalue = self.prune(float('-inf'),float('+inf'),state,'max',0)
+            bestvalue = self.basic_search(state,'max',0)
             print('Best_value: '+str(bestvalue))
             print(moves)
             exists = False
@@ -214,9 +217,72 @@ class CheckersAI():
             self.board.prev_state = after[0]
             print('playing picked move')
             print(np.array(after[0]))
+            print(self.val_list)
             return self.grid_to_world(picked_best,cap) #cap should be None
 
 
+    def basic_search(self,node,is_max,level):
+        val = 0
+        self.is_game_over(node)
+        if self.game_over or level > 4: #return utility of the node if terminal node
+            if self.game_over == False:
+
+                if self.board.baxter_color == 'black':
+                    val = 4*(self.board.black_total - self.board.red_total)
+                else:
+                    val = 4*(self.board.red_total - self.board.black_total)
+            else:
+                print('GAMEOVER')
+                if self.winner == 'baxter': #returns count of baxter's pieces
+                    if self.board.baxter_color == 'black':
+                        val = 4*(self.board.black_total - self.board.red_total)
+                    else:
+                        val = 4*(self.board.red_total - self.board.black_total)
+            return val
+
+        if is_max == 'max': #baxter is maximizing
+            moves,cap,p = self.board.get_moves(node,self.board.baxter_color) #gets moves for current node
+            max_v = float("-inf")
+            count = 0
+            init_state = copy.deepcopy(node)
+            for move in moves:
+                count += 1
+                print('Max next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
+                child,captured = self.make_move(move,cap,init_state,p,is_ai=True)
+                print('child:\n '+str(np.array(child)))
+                evaluate = self.basic_search(child,'min',level+1)
+                print("Utility of Max's child node: "+str(evaluate))
+                max_v = max(max_v,evaluate)
+                self.path.append([move,max_v])
+                '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
+                init_state = self.undo_move(move,cap,captured,child,p)
+                self.game_over = False #
+                self.winner = None
+
+            # print('returning val (max): '+str(max_v))
+            self.val_list.append(['Max level: '+str(level),max_v])
+            return max_v #return maximum of all children
+
+        else: #minimizing player
+            moves, cap,p = self.board.get_moves(node,self.board.not_baxter) #gets moves for current node
+            min_v = float("+inf")
+            init_state = copy.deepcopy(node)
+            count = 0
+            for move in moves:
+                count += 1
+                print('Min next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
+                child,captured = self.make_move(move,cap,init_state,p,is_ai=True)
+                print('child:\n '+str(np.array(child)))
+                evaluate = self.basic_search(child,'max',level+1)
+                print("Utility of Min's child node: "+str(evaluate))
+                min_v = min(min_v,evaluate)
+                '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
+                init_state = self.undo_move(move,cap,captured,child,p)
+                self.game_over = False
+                self.winner = None
+            # print('returning val (max): '+str(min_v))
+            self.val_list.append(['Min level: '+str(level),min_v])
+            return min_v #return minimum of all children
 
 
     def prune(self,alpha,beta,node,is_max,level): #based on pseudocode from https://www.hackerearth.com/blog/developers/minimax-algorithm-alpha-beta-pruning/
@@ -424,7 +490,7 @@ class Board():
         #print(self.baxter_color)
         self.init_state = state
         self.get_piece_count(state)
-        #print(state)
+        print(np.array(state))
         return state
 
 
