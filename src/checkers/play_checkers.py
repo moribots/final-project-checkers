@@ -15,14 +15,6 @@ class CheckersAI():
         self.winner = None
         self.alpha = float('-inf')
         self.beta = float('+inf')
-        state = [[-1, 0,-1, 0,-1, 0,-1, 0],
-                 [ 0,-1, 0,-1, 0,-1 ,0,-1],
-                 [-1, 0,-1, 0,-1, 0,-1, 0],
-                 [ 0, 0, 0, 0, 0, 0, 0, 0],
-                 [ 0, 0, 0, 0, 0, 0, 0, 0],
-                 [ 0, 1, 0, 1, 0, 1, 0, 1],
-                 [ 1, 0, 1, 0, 1, 0, 1, 0],
-                 [ 0, 1, 0, 1, 0, 1, 0, 1]]
         self.board = Board()
 
     def give_command(self,state_list):#,color(used for testing)):
@@ -74,7 +66,7 @@ class CheckersAI():
         return self.grid_to_world([start, goal], captured)
 
     def switch_turn(self):
-        '''Sets variable for which players turn it is to the other player'''
+        '''Sets variable from whichever players turn it is to the other player'''
         if self.whos_turn == 'Red':
             self.whos_turn = 'Black'
         else:
@@ -122,7 +114,16 @@ class CheckersAI():
         return movelist
 
     def make_move(self,move,cap,state,p,is_ai=False):
-        '''make a array of board states (nodes) after all legal moves starting from current state. include whether or not the node is terminal'''
+        '''ARGS:
+            move: [[start,goal]], position of the move to be made
+            cap: [[start,capture]], position of any captures from that start position
+            state: the current board state array
+            p: +/-1 to denote which color's turn it is
+            is_ai: (bool) whether function is being used in context of minimax(forward simulation) or actaully making the move
+           Returns:
+            state: updated board array
+            captured: list of positions of captured pieces
+           Make an updated array of board state after legal move, starting from passed state.'''
         if len(state) > 8:
             #print('world_to_grid')
             state = self.board.world_to_grid(state)
@@ -161,6 +162,15 @@ class CheckersAI():
         return state,captured
 
     def undo_move(self,move,cap,cap_piece,state,player):
+        '''ARGS:
+            move: [[start,goal]], position of the move to be made
+            cap: [[start,capture]], position of any captures from that start position
+            cap_piece: +/-1 to denote which color of the captured piece
+            state: the current board state array
+            player: +/-1 to denote which color's turn it is
+           Returns:
+            state: updated board array
+           Returns board array to state before a move was made'''
         K = 1
         #player = self.board.p #Assumes winning player made the last move
         #if self.game_over == False: #max level reached so other play made the last move
@@ -180,8 +190,14 @@ class CheckersAI():
         return state
 
     def minimax(self,state_list):
-        '''Minimax algorithm to get best moves for baxter
-            ARGS: max: (bool) is maximizing player?'''
+        '''ARGS:
+            state_list: string containinig board occpancy at each index(board square) from top left to bottom
+           Return:
+            movelist: list of board indeices (0-63) from top left to bottom
+           Runs Minimax algorithm to get best moves for baxter. Converts input to board array and checks if there are any captures, which are passed immediatly. If no captures,
+           calls the prune function(alpha beta pruning) to get the best move value. Compares that value to the list of moves from the initial state, and saves a list of the legal moves
+           that match the bestvalue. If there are more than one legal move with best value, randomly select one. Convert this picked move to the movelist and return it.
+                '''
         state = self.board.world_to_grid(state_list)
         best_move = []
         moves,cap,p = self.board.get_moves(state,self.board.baxter_color)
@@ -221,6 +237,11 @@ class CheckersAI():
             return self.grid_to_world(picked_best,cap) #cap should be None
 
     def score_board(self,state):
+        '''ARGS:
+            state: board state to score
+           Returns:
+            val: score of the board
+           Calculates the score of the board. conditions change based on if it results in a game over or just minimum layer'''
         if self.game_over == False:
 
             if self.board.baxter_color == 'black':
@@ -237,6 +258,15 @@ class CheckersAI():
         return val
 
     def basic_search(self,node,is_max,level): #Minimax with no optimization (alpha beta pruning). works, but scoreing needs work
+        '''ARGS:
+            node: current state array
+            is_max: string denoting whether its the maximizing or minimizing players turn
+            level: current depth of tree
+           Returns:
+            val/max_v/min: terminal/mamximum/minimum score
+           Basic minimax, no pruning, where it applys moves to the initial state and returns the score from the terminal nodes back up the layers
+           taking either the minimum or maximum score depending on the layer
+           '''
         val = 0
         self.is_game_over(node)
         if self.game_over or level > 4: #return utility of the node if terminal node
@@ -433,19 +463,20 @@ class Board():
                             not_bax = -1
                         if state[r][c] != self.prev_state[r][c]: #board state changed
                             for king in self.enemy_king_list: #loop through enemy kings
-
+                                print(king)
                                 if state[r][c] == 0 and king == [r,c]: #if a king is no longer where it was
                                     king_move == True # we know its a king's move
-                                    # print('king_move')
+                                    print('king_move')
                                     try:
                                         self.enemy_king_list.remove([r,c]) #the old index for the king is removed
-                                        # print('enemy: '+str(self.enemy_king_list))
+                                        print('enemy: '+str(self.enemy_king_list))
                                     except ValueError:
                                         print('ValueError, not on list')
 
                             if state[r][c] != 0 and state[r][c] == not_bax: #only humans piece should be moved.
                                 state[r][c] *= 2
-                                self.enemy_king_list.append([r,c]) #add new location of king to list
+                                if [r,c] not in self.enemy_king_list:
+                                    self.enemy_king_list.append([r,c]) #add new location of king to list
                                 # print('king_move '+str(self.enemy_king_list))
 
                             for king in self.bax_king_list: #loop through baxter's kings
@@ -474,7 +505,8 @@ class Board():
                         c += 1
         except IndexError:
             print('IndexError: length of list is '+str(len(list)))
-        # print(self.bax_king_list)
+        print(self.bax_king_list)
+        print(self.enemy_king_list)
         if self.baxter_color == None:
             if state[-1][-2] == 1: #colors determined here !!
                 self.baxter_color = 'red'
