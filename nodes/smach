@@ -425,7 +425,7 @@ class MYTURN(smach.State):
                     # print("found one")
                     self.client.str_count += 1
 
-        rospy.logdebug(list_from_cam)
+        rospy.loginfo(list_from_cam)
         rospy.loginfo("Use AI? (y/n)")
         ai = raw_input()
         if ai == "y":
@@ -445,7 +445,9 @@ class MYTURN(smach.State):
 
         # Call logic function to determine win/lose
         end_game = self.client.chai.game_over
+        rospy.loginfo(end_game)
         winner = self.client.chai.winner
+        rospy.loginfo(winner)
         if end_game is True:
             if winner == "baxter":
                 rospy.loginfo("Baxter wins!")
@@ -585,7 +587,9 @@ class MOVE(smach.State):
 
         # Call logic function to determine win/lose
         end_game = self.client.chai.game_over
+        rospy.loginfo(end_game)
         winner = self.client.chai.winner
+        rospy.loginfo(winner)
         if end_game is True:
             if winner == "baxter":
                 rospy.loginfo("Baxter wins!")

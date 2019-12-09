@@ -187,7 +187,15 @@ class CheckersAI():
         moves,cap,p = self.board.get_moves(state,self.board.baxter_color)
         # print(moves)
         # self.val_list = []
-        if len(moves) == 1: return self.grid_to_world(moves[0],cap) #captured moves are forced
+        if len(moves) == 1: 
+            print('Picked move: '+str(moves[0]))
+            confirmed = raw_input('Play move(y/n)?')
+            if confirmed == 'n':
+                return [None]
+            after = self.make_move(moves[0],cap,state,p)
+            self.board.prev_state = after[0]
+            print(np.array(after[0]))
+            return self.grid_to_world(moves[0],cap) #captured moves are forced
         else:
             self.path = []
             bestvalue = self.prune(float('-inf'),float('+inf'),state,'max',0)
@@ -213,11 +221,15 @@ class CheckersAI():
             if len(best_move) > 1:
                 i = np.random.randint(0,len(best_move))
             picked_best = best_move[i]
+            print('Picked move: '+str(picked_best))
+            confirmed = raw_input('Play move(y/n)?')
+            if confirmed == 'n':
+                return [None]
             print(np.array(state))
             after = self.make_move(picked_best,cap,state,p)
             self.board.prev_state = after[0]
-            print('playing picked move: '+str(picked_best))
             print(np.array(after[0]))
+            
             return self.grid_to_world(picked_best,cap) #cap should be None
 
     def score_board(self,state):
@@ -424,40 +436,40 @@ class Board():
                     state[r][c] = piece
                     # print(state)
 
-                    if self.prev_state != None:
-                        if self.baxter_color == 'black':
-                            baxter = -1
-                            not_bax = 1
-                        else:
-                            baxter = 1
-                            not_bax = -1
-                        if state[r][c] != self.prev_state[r][c]: #board state changed
-                            for king in self.enemy_king_list: #loop through enemy kings
+                    # if self.prev_state != None:
+                    #     if self.baxter_color == 'black':
+                    #         baxter = -1
+                    #         not_bax = 1
+                    #     else:
+                    #         baxter = 1
+                    #         not_bax = -1
+                    #     if state[r][c] != self.prev_state[r][c]: #board state changed
+                    #         for king in self.enemy_king_list: #loop through enemy kings
 
-                                if state[r][c] == 0 and king == [r,c]: #if a king is no longer where it was
-                                    king_move == True # we know its a king's move
-                                    # print('king_move')
-                                    try:
-                                        self.enemy_king_list.remove([r,c]) #the old index for the king is removed
-                                        # print('enemy: '+str(self.enemy_king_list))
-                                    except ValueError:
-                                        print('ValueError, not on list')
+                    #             if state[r][c] == 0 and king == [r,c]: #if a king is no longer where it was
+                    #                 king_move == True # we know its a king's move
+                    #                 # print('king_move')
+                    #                 try:
+                    #                     self.enemy_king_list.remove([r,c]) #the old index for the king is removed
+                    #                     # print('enemy: '+str(self.enemy_king_list))
+                    #                 except ValueError:
+                    #                     print('ValueError, not on list')
 
-                            if state[r][c] != 0 and state[r][c] == not_bax: #only humans piece should be moved.
-                                state[r][c] *= 2
-                                self.enemy_king_list.append([r,c]) #add new location of king to list
-                                # print('king_move '+str(self.enemy_king_list))
+                    #         if state[r][c] != 0 and state[r][c] == not_bax: #only humans piece should be moved.
+                    #             state[r][c] *= 2
+                    #             self.enemy_king_list.append([r,c]) #add new location of king to list
+                    #             # print('king_move '+str(self.enemy_king_list))
 
-                            for king in self.bax_king_list: #loop through baxter's kings
-                                if [r,c] in self.bax_king_list and state[r][c] != 0: #king on baxter's list, and is still there
-                                    state[r][c] *= 2 # update value
-                                    # print('baxters kings updated')
-                                elif [r,c] in self.bax_king_list and state[r][c] == 0: #if no longer there, jumped
-                                    try:
-                                        # print('remove king from baxters list')
-                                        self.bax_king_list.remove([r,c]) #remove from king list
-                                    except ValueError:
-                                        print('ValueError, not on list')
+                    #         for king in self.bax_king_list: #loop through baxter's kings
+                    #             if [r,c] in self.bax_king_list and state[r][c] != 0: #king on baxter's list, and is still there
+                    #                 state[r][c] *= 2 # update value
+                    #                 # print('baxters kings updated')
+                    #             elif [r,c] in self.bax_king_list and state[r][c] == 0: #if no longer there, jumped
+                    #                 try:
+                    #                     # print('remove king from baxters list')
+                    #                     self.bax_king_list.remove([r,c]) #remove from king list
+                    #                 except ValueError:
+                    #                     print('ValueError, not on list')
 
 
                     if c == 7:
