@@ -192,21 +192,19 @@ class PickPlace():
                           j4=1.48,
                           j5=-1.57,
                           j6=0.114):
-        """ DESCRIPTION:
+        """ Sends the right arm to a specified joint configuration
 
-            Args:
-
-            Returns:
+            Args: j0-j6, joint values for the arm
 
 
-            SMALL TABLE: j0=-0.76, j1=0.19, j2=1.23, j3=1.95, j4=1.244, j5=-1.33, j6=0.56
+            SMALL TABLE: j0=-0.76, j1=0.19, j2=1.23,
+            j3=1.95, j4=1.244, j5=-1.33, j6=0.56
         """
         # Planning to a Joint Goal
         # Get current pose to set type
         joint_goal = self.move_group.get_current_joint_values()
         # Overwrite current pose with desired pose
         # Default pose is out of board's way
-        print("JOINT GOAL".format(joint_goal))
         joint_goal[0] = j0
         joint_goal[1] = j1
         joint_goal[2] = j2
@@ -228,18 +226,15 @@ class PickPlace():
                         j4=1.57,
                         j5=1.513,
                         j6=0.124):
-        """ DESCRIPTION:
+        """ Sends the left arm to a specified joint configuration
 
-            Args:
-
-            Returns:
+            Args: j0-j6, joint values for the arm
         """
         # Planning to a Joint Goal
         # Get current pose to set type
         joint_goal = self.cam_group.get_current_joint_values()
         # Overwrite current pose with desired pose
         # Default pose is out of board's way
-        print("JOINT GOAL".format(joint_goal))
         joint_goal[0] = j0
         joint_goal[1] = j1
         joint_goal[2] = j2
@@ -295,7 +290,8 @@ class PickPlace():
         # current_pose = self.move_group.get_current_pose().pose
 
     def pick_cartesian(self, goal, feedback, cal=False):
-        """ Receives a pick goal and performs 4 actions:
+        """ Receives a pick goal and performs 4 actions after moving
+            the pick arm (right) to board-side dependent home config:
 
             1 - Moves to a pre-grasp position (approach) in the
             x-y position of the supplied goal, but offset in the z
@@ -333,6 +329,7 @@ class PickPlace():
         # Go to pick_place home config
         # y below -0.15
         if goal[1] < -0.11:
+            # right half of the board wrt baxter
             j0 = -0.6
             j1 = 0.123
             j2 = 1.17
@@ -348,6 +345,7 @@ class PickPlace():
             # j5 = -1.48
             # j6 = 0.953
         else:
+            # left half of the board wrt baxter
             j0 = 0.09395632325798159
             j1 = 0.31
             j2 = 1.23
@@ -356,7 +354,14 @@ class PickPlace():
             j5 = -1.57
             j6 = 0.233
         # SMALL TABLE
-        # j0 = 0.09395632325798159 j1 = 0.4088058799714628 j2 = 1.313087554429914 j3 = 1.9941750242510379 j4 = 1.0657331523833913 j5 = -1.5274613695369008 j6 = 1.3652429012180183
+        # j0 = 0.09395632325798159
+        # j1 = 0.4088058799714628
+        # j2 = 1.313087554429914
+        # j3 = 1.9941750242510379
+        # j4 = 1.0657331523833913
+        # j5 = -1.5274613695369008
+        # j6 = 1.3652429012180183
+        # put right arm at chosen joint config
         self.go_to_joint_state(j0, j1, j2, j3, j4, j5, j6)
         # Publish feedback
         feedback.completed_moves.append("home_start")
@@ -377,7 +382,7 @@ class PickPlace():
         # GRASP GOAL
         rospy.loginfo("================== Grasp ==============")
         # Pass the goal and the grasp z coordinate
-        # If calibrating, put gripper slightly above board
+        # If calibrating, put gripper slightly above board (+0.02)
         if cal is True:
             path_type = self.create_path(goal, self.z + 0.02, only_z=True)
         else:
@@ -460,7 +465,7 @@ class PickPlace():
         rospy.loginfo("================== Release ==============")
         # Pass the goal and the release z coordinate
         if goal[1] < -0.3 + self.psc[1]:
-            # discard condition
+            # discard condition, z + 0.05
             path_type = self.create_path(goal, self.z + 0.05, only_z=True)
         else:
             path_type = self.create_path(goal, self.z, only_z=True)
