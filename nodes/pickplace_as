@@ -20,10 +20,9 @@ DESCRIPTION: The Pick Place Action Server. This server uses MoveIt!
             camera_view is True: sets the left arm to its predefined
             board view configuration
 
-            calibrate is True: sets self.count to zero to request
-            a self.Tcb and self.Tsc update to calibrate the transform
-            between the board frame and Baxter's world frame in an
-            effort to send accurate goals.
+            calibrate is True: if `True`, records the left end-effector's
+            cartesian coordinates and saves them to be added as an offset
+            to any given pick or place goals in the future.
 
             If none of these goals (booleans) are set to True, the pick_goal
             and place_goal [x,y] coordinates are used to perform pick and place
