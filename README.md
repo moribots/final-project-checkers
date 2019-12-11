@@ -50,6 +50,10 @@ When you are ready to push to `upstream` (the shared repo):
 * Once everything works, `git checkout master`, and `git merge <your_personal_branch>`
 * `git push upstream` and `git push origin`
 
+**UPDATING SPHYNX DOCUMENTATION**
+
+**ADDING MORE UNIT TESTS**
+
 ****
 ## Nodes and Launchfile
 
@@ -100,6 +104,6 @@ The first three goals are actuatied using the `joint_goal` method, while the lat
 ## System Architecture
 
 ## Future Work
-A big improvement would be to add a re-planning feature using Force Control. For example, if Baxter detects that it should have picked up a piece when it in fact did not, it should try the move again. This should be easy to achieve using the existing structure of the action server. In addition, while the `MoveIt!` methods were generally robust (an average of 3 failures per 30-minute game), some further optimisation could be done, such as having more hard-coded home positions for the picking arm depending on reachability, using the camera arm as a secondary picking arm, or performing the motion planning from scratch by using the methods described in [Modern Robotics Package](https://github.com/NxRLab/ModernRobotics/tree/master/packages/Python). In addition, `MoveIt!` seems more suited for use with C++ as opposed to Python, as it contains more methods and more robust ones for those also supported in Python.
+A big improvement would be to add a re-planning feature using Force Control. For example, if Baxter detects that it should have picked up a piece when it in fact did not, it should try the move again. This should be easy to achieve using the existing structure of the action server. In addition, while the `MoveIt!` methods were generally robust (an average of 3 failures per 30-minute game), some further optimisation could be done, such as having more hard-coded home positions for the picking arm depending on reachability, using the camera arm as a secondary picking arm, or performing the motion planning from scratch by using the methods described in [Modern Robotics Package](https://github.com/NxRLab/ModernRobotics/tree/master/packages/Python). It should also be possible to dive deeper into the failure cases for `MoveIt!` and abort/resume a motion plan at a failure point as the current implementation only checks for failures in planning, not execution. As an aside, `MoveIt!` seems more suited for use with C++ as opposed to Python, as it contains more methods and more robust ones for those also supported in Python.
 
 In addition, calibrating the z-coordinate for the pick-place actions is tedious, and Force control could be used to semi-automate that process for differently sized or situated tables.
