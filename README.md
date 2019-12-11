@@ -2,7 +2,7 @@
 ## Maurice Rahme, Robert Schloen, Jordan Zeeb, Taoran Zhang
 ****
 ## Project Overview
-This package allows a Baxter robot to play checkers using the modern ruleset! You have a choice to play using our custom checkers AI, or against a human-operated Baxter robot. This project was completing as part of the final project requirement for ME495: Embedded Systems in Robotics taught by Prof. Matthew Elwin. This project placed 1st in the judged competition between a total of 6 project teams. The theme for this year's competition was recreational robotics, and the other teams' projects were: Terminator (a nerf-gun shooting robot), Mini-Golf, Cornhole, Tic-Tac-Toe and MegaBLOKS. If you liked this project, you should check them out!
+This package allows a Baxter robot to play checkers using the modern ruleset! You have a choice to play using our custom checkers AI, or against a human-operated Baxter robot. This project was completing as part of the final project requirement for ME495: Embedded Systems in Robotics taught by Prof. Matthew Elwin. This project placed 1st in the judged competition between a total of 6 project teams. The theme for this year's competition was recreational robotics, and the other teams' projects were: Terminator (a nerf-gun shooting robot), Mini-Golf, Cornhole, Tic-Tac-Toe and MegaBLOKS.
 
 Here is a video of an AI-operated game:
 
@@ -18,9 +18,9 @@ Here is a video of a human-operated game:
 * Make sure you have the rethink robotics workspace installed and sourced.
 * Run catkin_make in your catkin workspace after sourcing it.
 * Set up the game table.
-* Plug Baxter's ethernet cable into your computer.
+* Plug Baxter's ethernet cable into your computer and connect using a profile as shown in [this guide](https://nu-msr.github.io/me495_site/lecture13_rethink.html).
 * Connect to baxter using ` ROS_MASTER_URI=http://10.42.0.2:11311` and `export ROS_IP=10.42.0.1`.
-* `roslaunch roslaunch checkers moveit_motion_plan.launch`
+* `roslaunch checkers moveit_motion_plan.launch`
 * In a separate terminal, `rosrun checkers pick_place_as`
 * In a separate terminal, `rosrun checkers smach` (this is the main terminal you will interface with, the others are for debugging and diagnostics)
 * Follow the instructions on the terminal where you opened `smach`, you are ready to play!
@@ -72,7 +72,7 @@ This node is the main interface between the other nodes and scripts in the check
 
 Alternatively, the user can choose to decline the AI's suggested move, or to play a move themselves for whatever reason. In this case, a single-element move list containing `None` is passed. In addition, the processed image from the `bridge` node is shown here by sending "left" to the `arm_img` topic, which the `screen` node subscribes to.
 
-**MOVE**: The moves list is read as `userdata` through `smach`. If the first element contains `None`, a `Warning` is printed saying that no move was played, and the **WAIT** state is enqueued. Otherwise, the action server is sent a pick and place goal using the first two elements of the moves list respectively, and discard goals for every additional element in the list. The cartesian (x,y) coordinates are extracted from the moves list using a stored dictionary which multiplies the width of a square by the number of squares in every direction, and adds this to an offset calclated during the calibration method in the **SETUP** state. The discard place location is hard-coded. These goals are executed using `MoveIt!`'s Python wrapper for their cartesian path planner. While this is happening, the video feed from the right arm camera is shown by sending "right" to the `arm_img` topic, which the `screen` node subscribes to.
+**MOVE**: The moves list is read as `userdata` through `smach`. If the first element contains `None`, a `Warning` is printed saying that no move was played, and the **WAIT** state is enqueued. Otherwise, the action server is sent a pick and place goal using the first two elements of the moves list respectively, and discard goals for every additional element in the list. The cartesian (x,y) coordinates are extracted from the moves list using a stored dictionary which multiplies the width of a square by the number of squares in every direction, and adds this to an offset calclated during the calibration method in the **SETUP** state. The discard place location is hard-coded. These goals are executed using `MoveIt!`'s Python wrapper for their cartesian path planner. While this is happening, the video feed from the right arm camera is shown by sending "right" to the `arm_img` topic, which the `screen` node subscribes to. Finally, the `CheckersAI` class stores whether this move would have won the game. If this is the case, the **SHUTDOWN** state is enqueued and the winner is listed. Otherwise, the **WAIT** state is enqueued.
 
 **SHUTDOWN**: Here, the user is asked to put Baxter's arms in a safe position using a `Warning` type message. Then, once the user hits enter, Baxter is disabled.
 
