@@ -203,7 +203,15 @@ class CheckersAI():
         moves,cap,p = self.board.get_moves(state,self.board.baxter_color)
         # print(moves)
         # self.val_list = []
-        if len(moves) == 1: return self.grid_to_world(moves[0],cap) #captured moves are forced
+        if len(moves) == 1:
+            print('Picked move: '+str(moves[0]))
+            confirmed = raw_input('Play move(y/n)?')
+            if confirmed == 'n':
+                return [None]
+            after = self.make_move(moves[0],cap,state,p)
+            self.board.prev_state = after[0]
+            print(np.array(after[0]))
+            return self.grid_to_world(moves[0],cap) #captured moves are forced
         else:
             self.path = []
             bestvalue = self.prune(float('-inf'),float('+inf'),state,'max',0)
@@ -229,11 +237,15 @@ class CheckersAI():
             if len(best_move) > 1:
                 i = np.random.randint(0,len(best_move))
             picked_best = best_move[i]
+            print('Picked move: '+str(picked_best))
+            confirmed = raw_input('Play move(y/n)?')
+            if confirmed == 'n':
+                return [None]
             print(np.array(state))
             after = self.make_move(picked_best,cap,state,p)
             self.board.prev_state = after[0]
-            print('playing picked move: '+str(picked_best))
             print(np.array(after[0]))
+
             return self.grid_to_world(picked_best,cap) #cap should be None
 
     def score_board(self,state):
