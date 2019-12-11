@@ -1,0 +1,6 @@
+- git:
+    local-name: checkers
+    uri: git@github.com:moribots/final-project-checkers.git
+- git:
+    local-name: moveit_robots
+    uri: git@github.com:moribots/moveit_robots.git
