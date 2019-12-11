@@ -3,18 +3,11 @@ import copy
 class CheckersAI():
     '''Keeps track of game progress and uses Minimax with alpha beta pruning to find best move for the Baxter robot'''
     def __init__(self):
+        '''Initialize CheckersAI class variables and creates Board class object'''
         self.game_over = False
-        self.baxter_color = 'black'#None
-
-        if self.baxter_color == 'black':
-            self.not_baxter = 'red'
-        elif self.baxter_color == 'red':
-            self.not_baxter = 'black'
         self.whos_turn = 'black' #black goes first
         self.noCapture = 0
         self.winner = None
-        self.alpha = float('-inf')
-        self.beta = float('+inf')
         self.board = Board()
 
     def give_command(self,state_list):#,color(used for testing)):
@@ -73,6 +66,11 @@ class CheckersAI():
             self.whos_turn = 'Red'
 
     def is_game_over(self,state):
+        '''ARGS:
+            state: board state array
+        Takes board state and checks if the game is over by checking number of pieces left on the board, or whoever's turn it
+        is has no moves. Assigns winner variable to whoever won
+        '''
         self.board.get_piece_count(state)
         if self.board.red_piece_count == 0:
             if self.board.baxter_color == 'black':
@@ -95,18 +93,14 @@ class CheckersAI():
             self.game_over = True
 
     def grid_to_world(self,move,captured):
-        '''Converts moves from grid coordinates to index of 1-d list refering to board positions
-        assumes left to right, bottom to top from baxter's perspective
-        ARGS:
+        '''ARGS:
             move: list of start and goal postion ([[0,0],[2,2]])
             captured: list of start and captured piece locations ([[0,0],[1,1]])
-        Returns:
-            movelist: list of indeices corresponding to grid coordinates'''
+           Returns:
+            movelist: list of indeices corresponding to grid coordinates
+        Converts moves from grid coordinates to index of 1-d list refering to board positions
+        assumes left to right, bottom to top from baxter's perspective'''
         movelist = [move[0][0]*8+move[0][1],move[1][0]*8+move[1][1]]
-        # cap_list = []
-        # for cap in captured:
-            # if cap not in cap_list:
-                # cap_list.append(cap)
         for cap in captured:
             if cap[1][0]*8+cap[1][1] not in movelist:
                 movelist.append(cap[1][0]*8+cap[1][1])
@@ -123,12 +117,9 @@ class CheckersAI():
            Returns:
             state: updated board array
             captured: list of positions of captured pieces
-           Make an updated array of board state after legal move, starting from passed state.'''
+        Make an updated array of board state after legal move, starting from given state.'''
         if len(state) > 8:
-            #print('world_to_grid')
             state = self.board.world_to_grid(state)
-        #print('moves: '+str(move))
-        #print('captures: '+str(cap))
         K = 1
         if self.board.baxter_color == 'black':
             baxter = -1
@@ -146,19 +137,9 @@ class CheckersAI():
         captured = []
         if len(cap) != 0 and cap[0][0] == move[0]:
             for piece in cap:
-                # print('Capture '+str(piece))
                 captured.append(state[piece[1][0]][piece[1][1]])
                 state[piece[1][0]][piece[1][1]] = 0
-                # cap_count = 0
-        # else:
-            # cap_count += 1 #if it counts too high its a draw
-        # self.noCapture = cap_count
-        # print(self.noCapture)
-        #self.capture_count = self.noCapture
         self.is_game_over(state)
-        #if self.game_over:
-            # print('Game over: Winner: '+str(self.winner))
-        #nodes.append([move,temp_state,w])
         return state,captured
 
     def undo_move(self,move,cap,cap_piece,state,player):
@@ -170,23 +151,15 @@ class CheckersAI():
             player: +/-1 to denote which color's turn it is
            Returns:
             state: updated board array
-           Returns board array to state before a move was made'''
+        Returns board array to state before a move was made'''
         K = 1
-        #player = self.board.p #Assumes winning player made the last move
-        #if self.game_over == False: #max level reached so other play made the last move
-        #    player = self.board.not_p
         if state[move[1][0]][move[1][1]] == player*2: #only have to worry about piece before move
             K = 2
         state[move[1][0]][move[1][1]] = 0
         state[move[0][0]][move[0][1]] = K*player #should still be the last players value
         if len(cap) != 0 and cap[0][0] == move[0]:
             for i in range(len(cap)):
-                #print('Capture '+str(piece))
                 state[cap[i][1][0]][cap[i][1][1]] = cap_piece[i]
-        # if cap_count != 0:
-        #     cap_count -= 1
-        # self.noCapture = cap_count
-        # print(np.array(state))
         return state
 
     def minimax(self,state_list):
@@ -194,38 +167,31 @@ class CheckersAI():
             state_list: string containinig board occpancy at each index(board square) from top left to bottom
            Return:
             movelist: list of board indeices (0-63) from top left to bottom
-           Runs Minimax algorithm to get best moves for baxter. Converts input to board array and checks if there are any captures, which are passed immediatly. If no captures,
-           calls the prune function(alpha beta pruning) to get the best move value. Compares that value to the list of moves from the initial state, and saves a list of the legal moves
-           that match the bestvalue. If there are more than one legal move with best value, randomly select one. Convert this picked move to the movelist and return it.
-                '''
+        Runs Minimax algorithm to get best moves for baxter. Converts input to board array and checks if there are any captures, which are passed immediatly. If no captures,
+        calls the prune function(alpha beta pruning) to get the best move value. Compares that value to the list of moves from the initial state, and saves a list of the legal moves
+        that match the bestvalue. If there are more than one legal move with best value, randomly select one. Convert this picked move to the movelist and return it.
+        '''
         state = self.board.world_to_grid(state_list)
         best_move = []
         moves,cap,p = self.board.get_moves(state,self.board.baxter_color)
-        # print(moves)
-        # self.val_list = []
         if len(moves) == 1: return self.grid_to_world(moves[0],cap) #captured moves are forced
         else:
             self.path = []
             bestvalue = self.prune(float('-inf'),float('+inf'),state,'max',0)
             # bestvalue = self.basic_search(state,'min',0)
             print('Best_value: '+str(bestvalue))
-            # print(moves)
             exists = False
-            # print(self.path)
             for move in moves:
                 for step in self.path:
                     if step[0] == move:
                         if step[1] == bestvalue:
                             if step[0] not in best_move:
-                                # print(step)
                                 best_move.append(step[0])
                         elif step[1] > bestvalue:
-                            # print(step)
                             best_move = [step[0]]
                             break
             # print('Best move: '+str(best_move))
             i = 0
-
             if len(best_move) > 1:
                 i = np.random.randint(0,len(best_move))
             picked_best = best_move[i]
@@ -241,7 +207,7 @@ class CheckersAI():
             state: board state to score
            Returns:
             val: score of the board
-           Calculates the score of the board. conditions change based on if it results in a game over or just minimum layer'''
+        Calculates the score of the board. conditions change based on if it results in a game over or just minimum layer'''
         if self.game_over == False:
 
             if self.board.baxter_color == 'black':
@@ -264,9 +230,9 @@ class CheckersAI():
             level: current depth of tree
            Returns:
             val/max_v/min: terminal/mamximum/minimum score
-           Basic minimax, no pruning, where it applys moves to the initial state and returns the score from the terminal nodes back up the layers
-           taking either the minimum or maximum score depending on the layer
-           '''
+        Basic minimax, no pruning, where it applys moves to the initial state and returns the score from the terminal nodes back up the layers
+        taking either the minimum or maximum score depending on the layer
+        '''
         val = 0
         self.is_game_over(node)
         if self.game_over or level > 4: #return utility of the node if terminal node
@@ -279,22 +245,19 @@ class CheckersAI():
             init_state = copy.deepcopy(node)
             for move in moves:
                 count += 1
-                print('Max next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
+                # print('Max next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
                 child,captured = self.make_move(move,cap,init_state,p,is_ai=True)
-                print('child:\n '+str(np.array(child)))
+                # print('child:\n '+str(np.array(child)))
                 evaluate = self.basic_search(child,'min',level+1)
-                print("Utility of Max's child node: "+str(evaluate)+" vs. current Max value: "+str(max_v))
+                # print("Utility of Max's child node: "+str(evaluate)+" vs. current Max value: "+str(max_v))
                 max_v = max(max_v,evaluate)
-                print('Updated Max Value: '+str(max_v))
+                # print('Updated Max Value: '+str(max_v))
 
                 self.path.append([move,max_v])
                 '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
                 init_state = self.undo_move(move,cap,captured,child,p)
                 self.game_over = False #
                 self.winner = None
-
-            # print('returning val (max): '+str(max_v))
-            # self.val_list.append(['Max level: '+str(level),max_v])
             return max_v #return maximum of all children
 
         else: #minimizing player
@@ -304,24 +267,30 @@ class CheckersAI():
             count = 0
             for move in moves:
                 count += 1
-                print('Min next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
+                # print('Min next move('+str(count)+' of '+str(len(moves))+') on level '+str(level))
                 child,captured = self.make_move(move,cap,init_state,p,is_ai=True)
-                print('child:\n '+str(np.array(child)))
+                # print('child:\n '+str(np.array(child)))
                 evaluate = self.basic_search(child,'max',level+1)
-                print("Utility of Min's child node: "+str(evaluate)+" vs. current Min value: "+str(min_v))
+                # print("Utility of Min's child node: "+str(evaluate)+" vs. current Min value: "+str(min_v))
                 min_v = min(min_v,evaluate)
-                print('Updated Min Value: '+str(min_v))
+                # print('Updated Min Value: '+str(min_v))
                 '''Once terminal node reached, undo last move and set game_over and winner back to false/none'''
                 init_state = self.undo_move(move,cap,captured,child,p)
                 self.game_over = False
                 self.winner = None
-            # print('returning val (max): '+str(min_v))
-            # self.val_list.append(['Min level: '+str(level),min_v])
             return min_v #return minimum of all children
 
 
     def prune(self,alpha,beta,node,is_max,level): #based on pseudocode from https://www.hackerearth.com/blog/developers/minimax-algorithm-alpha-beta-pruning/
-        '''Alpha beta pruning to optimize minimax''' #works, scoring needs work.
+        '''ARGS:
+            alpha: alpha value for this node
+            beta: beta value for this node
+            node: board state array
+            is_max: string denoting whether its the maximizing or minimizing players turn
+            level: current depth of tree
+           Returns:
+            val/max_v/min: terminal/mamximum/minimum score
+        Expansion on the basic_search function. Uses alpha beta pruning to optimize minimax algorithm'''
         val = 0
         self.is_game_over(node)
         if self.game_over or level > 9: #return utility of the node if terminal node
@@ -354,7 +323,7 @@ class CheckersAI():
                 init_state = self.undo_move(move,cap,captured,child,p)
                 self.game_over = False #
                 self.winner = None
-                if beta <= alpha: #don't update alpha and prune if its greater than beta
+                if beta <= alpha: #Prune condition
                     # print('Prune the rest of level '+str(level))
                     break
             return max_v #return maximum of all children
@@ -382,28 +351,29 @@ class CheckersAI():
                 self.game_over = False
                 self.winner = None
 
-                if beta <= alpha: #don't update alpha and prune if its greater than beta
+                if beta <= alpha: #Prune condition
                     # print('Prune the rest of level '+str(level))
                     break
             return min_v #return minimum of all children
 
 
-
-
 class Board():
     '''Keeps track of board state and move generation. Initialized and called only in the CheckersAI class'''
     def __init__(self):#,state):
+        '''Initialize Board class variables'''
         self.red_piece_count = 0
         self.black_piece_count = 0
         self.baxter_color = None
         self.prev_state = None
         self.bax_king_list = []
         self.enemy_king_list = []
-        #self.init_state = state
-        #self.state = state
 
 
     def get_piece_count(self,state):
+        '''ARGS:
+            state: board state array
+        From a given board state counts up number of pieces for each side and stores that count in class attribute. Function
+        also used for assigning scores for the board state that are used in the minimax algorithm'''
         self.red_piece_count = 0
         self.black_piece_count = 0
         self.red_total = 0
@@ -432,8 +402,12 @@ class Board():
         self.black_total = self.black_piece_count + black_king_count + advance_r
 
     def world_to_grid(self,list):
-        '''recieve list[0,63], left to right, top to bottom from top left of board, index refers to grid square (inorder),elements are 'empty','color1',color2,'color1_king',color2_king'''
-        '''Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position.'''
+        '''ARGS:
+            list: [0,63], left to right, top to bottom from top left of board, index refers to grid square (inorder),elements are 'empty','color1','color2'
+           Returns:
+            state: current board state array from computer vision
+        Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position. Updates position of Kings on the Board
+        and keeps track of new kings from the human player's turn'''
         state = [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]
         r = 0
         c = 0
@@ -505,8 +479,8 @@ class Board():
                         c += 1
         except IndexError:
             print('IndexError: length of list is '+str(len(list)))
-        print(self.bax_king_list)
-        print(self.enemy_king_list)
+        # print(self.bax_king_list)
+        # print(self.enemy_king_list)
         if self.baxter_color == None:
             if state[-1][-2] == 1: #colors determined here !!
                 self.baxter_color = 'red'
@@ -514,7 +488,6 @@ class Board():
             elif state[-1][-2] == -1:
                 self.baxter_color = 'black'
                 self.not_baxter = 'red'
-        #print(self.baxter_color)
         self.init_state = state
         self.get_piece_count(state)
         # print(np.array(state))
@@ -523,20 +496,29 @@ class Board():
 
 
     def get_moves(self,state,player):
-        '''ARGS: player: current players color, used to check moves for only that players moves
-        Returns list of all legal moves and captured pieces as tuple pairs (Ex. [[start],[goal]] and [[start],[captured_position]])'''
+        '''ARGS:
+            state: current board state
+            player: current players color, used to check moves for only that players moves
+           Returns:
+            moves: list of all legal moves and captured pieces as tuple pairs (Ex. [[start],[goal]])
+            capture: list of any captured pieces (Ex.[[start],[captured_position]])
+            p: +/- 1 representing the player's color
+        Determines player's color and uses that to determine which direction across the board to move. For example baxter pawns
+        move from row 7 of the array to row 0, and the other player's pawns move the opposite directions. Loops through the board state
+        to find pieces and their possible moves. Jumps are forced so only the jumping move is returned. '''
         def can_jump(row,col,step_r,step_c,state):
             '''ARGS:
                 row: current row
                 col: current column
                 step_r: directions to step row-wise
                 step_c: directions to step column-wise
+                state: board state array
                Returns:
                 move: (start, goal) pair (if any) of legal moves
                 captured: (start,captured piece position) pair of any captured pieces
                 cap: (bool) whether any pieces were captured or not
-            Checks if step in given direction keeps piece in bound, if it does, checks if there is a place to jump, and the jumped piece is the other player's
-                '''
+            Checks if step in given direction keeps piece in bounds, if it does, checks if there is a place to jump, and that the jumped piece is the other player's
+            '''
             captured = []
             move = []
             cap = False
@@ -553,35 +535,30 @@ class Board():
             ''' Args:
                  r: current row index
                  c: current column index
-                 step: either 1,-1, or both, states which direction side to side the piece can move diagonally
+                 state: board state array
                 Returns:
                  moves: list of (start, goal) pairs (if any) of legal moves
                  capture: list of (start,captured piece position) pairs of any captured pieces
-                Checks if a step is possible is each possible direction for a type of piece. if step is not possible, checks for jump.
-                if jump was successful, checks for possible double jumps.'''
+            Checks if a step is possible is each possible direction for a type of piece. if step is not possible, checks for jump.
+            if jump was successful, checks for possible double jumps. Jumps are forced so any jumps overwrites any existing moves and does not
+            look for any additional moves.'''
             moves = []
             capture = []
             step = []
             #set possible steps based on whether a pawn or king and which player
             if state[r][c] == self.p:
                 step = [[self.sgn*1,1],[self.sgn*1,-1]]
-            #elif state[r][c] == self.p and self.p == 1:
-            #    step = [[1,1],[1,-1]]
 
             if state[r][c] == self.p*2:
                 step = [[1,1],[1,-1],[-1,1],[-1,-1]]
-                #print('King')
             for s in step: #take a step in valid directions
                 stepc = s[1]
                 stepr = s[0]
-                # print(moves)
                 if c+stepc >= 0 and c+stepc <= 7 and r+stepr >= 0 and r+stepr <= 7: # Checks that the step won't take piece out of bounds
                     '''Single Step'''
                     if state[r+stepr][c+stepc] == 0: #if the diagonal square is empty, add step to list of legal moves
                         moves.append([[r,c],[r+stepr,c+stepc]])
-                        # print(True)
                     else: #If not empty, try to make a jump
-                        # print('jump')
                         move, cap, cap_success = can_jump(r,c,stepr,stepc,state) #single jump
                         '''Double jump'''
                         if cap_success: #check for double jump
@@ -601,10 +578,7 @@ class Board():
             return moves, capture
 
 
-
-        #currently assuming list
         self.get_piece_count(state)
-        # print(self.red_piece_count)
         moves = []
         temp = []
         capture = []
@@ -617,7 +591,6 @@ class Board():
                 self.p = -1 #baxter starts from the bottom
                 self.not_p = 1
             else:
-            #state = flip_board(state)
                 self.p = 1 #Red is +1
                 self.not_p = -1
         else:
@@ -625,17 +598,13 @@ class Board():
                 self.p = -1 #baxter starts from the bottom
                 self.not_p = 1
             else:
-            #state = flip_board(state)
                 self.p = 1 #Red is +1
                 self.not_p = -1
         #cycle through grid cells
         for r in range(8):
             for c in range(8):
-                # print(r,c)
                 mK,capK = can_step(r,c,state)
-
                 temp_moves = []
-                # print(mK)
                 for i in range(len(mK)):
                     if len(mK[i]) != 0:
                         temp_moves.append(mK[i])
@@ -645,7 +614,6 @@ class Board():
                         capture.append(capK[i])
                         capture_move = temp_moves
                         #return temp_moves, capture
-                        #for move in mk
         if len(capture) != 0:
             return capture_move, capture,self.p
 
