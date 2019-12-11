@@ -13,7 +13,7 @@ class CheckersAI():
     def give_command(self,state_list):#,color(used for testing)):
         '''ARGS:
                 state_list:string that stores the positions of the pieces on the board, output from CV node
-           Returns:
+        Return:
                 movelist: returns list of indicies for the pieces to move [start, goal, captured1,captured2,...]
         Takes state_list (string) converts it to integer board array. Deteremies baxter's color. Uses state array and
         baxter's color to get the legal moves. Waits for user to input a start and end goal then checks if this is a legal move.
@@ -96,7 +96,7 @@ class CheckersAI():
         '''ARGS:
             move: list of start and goal postion ([[0,0],[2,2]])
             captured: list of start and captured piece locations ([[0,0],[1,1]])
-           Returns:
+        Return:
             movelist: list of indeices corresponding to grid coordinates
         Converts moves from grid coordinates to index of 1-d list refering to board positions
         assumes left to right, bottom to top from baxter's perspective'''
@@ -114,7 +114,7 @@ class CheckersAI():
             state: the current board state array
             p: +/-1 to denote which color's turn it is
             is_ai: (bool) whether function is being used in context of minimax(forward simulation) or actaully making the move
-           Returns:
+        Return:
             state: updated board array
             captured: list of positions of captured pieces
         Make an updated array of board state after legal move, starting from given state.'''
@@ -149,7 +149,7 @@ class CheckersAI():
             cap_piece: +/-1 to denote which color of the captured piece
             state: the current board state array
             player: +/-1 to denote which color's turn it is
-           Returns:
+        Return:
             state: updated board array
         Returns board array to state before a move was made'''
         K = 1
@@ -165,7 +165,7 @@ class CheckersAI():
     def minimax(self,state_list):
         '''ARGS:
             state_list: string containinig board occpancy at each index(board square) from top left to bottom
-           Return:
+        Return:
             movelist: list of board indeices (0-63) from top left to bottom
         Runs Minimax algorithm to get best moves for baxter. Converts input to board array and checks if there are any captures, which are passed immediatly. If no captures,
         calls the prune function(alpha beta pruning) to get the best move value. Compares that value to the list of moves from the initial state, and saves a list of the legal moves
@@ -205,7 +205,7 @@ class CheckersAI():
     def score_board(self,state):
         '''ARGS:
             state: board state to score
-           Returns:
+        Return:
             val: score of the board
         Calculates the score of the board. conditions change based on if it results in a game over or just minimum layer'''
         if self.game_over == False:
@@ -228,7 +228,7 @@ class CheckersAI():
             node: current state array
             is_max: string denoting whether its the maximizing or minimizing players turn
             level: current depth of tree
-           Returns:
+        Return:
             val/max_v/min: terminal/mamximum/minimum score
         Basic minimax, no pruning, where it applys moves to the initial state and returns the score from the terminal nodes back up the layers
         taking either the minimum or maximum score depending on the layer
@@ -288,7 +288,7 @@ class CheckersAI():
             node: board state array
             is_max: string denoting whether its the maximizing or minimizing players turn
             level: current depth of tree
-           Returns:
+        Return:
             val/max_v/min: terminal/mamximum/minimum score
         Expansion on the basic_search function. Uses alpha beta pruning to optimize minimax algorithm'''
         val = 0
@@ -404,7 +404,7 @@ class Board():
     def world_to_grid(self,list):
         '''ARGS:
             list: [0,63], left to right, top to bottom from top left of board, index refers to grid square (inorder),elements are 'empty','color1','color2'
-           Returns:
+        Return:
             state: current board state array from computer vision
         Converts from computer vision input to grid array. Will be given an (x,y) position and color for that position. Updates position of Kings on the Board
         and keeps track of new kings from the human player's turn'''
@@ -499,7 +499,7 @@ class Board():
         '''ARGS:
             state: current board state
             player: current players color, used to check moves for only that players moves
-           Returns:
+        Return:
             moves: list of all legal moves and captured pieces as tuple pairs (Ex. [[start],[goal]])
             capture: list of any captured pieces (Ex.[[start],[captured_position]])
             p: +/- 1 representing the player's color
@@ -536,7 +536,7 @@ class Board():
                  r: current row index
                  c: current column index
                  state: board state array
-                Returns:
+            Return:
                  moves: list of (start, goal) pairs (if any) of legal moves
                  capture: list of (start,captured piece position) pairs of any captured pieces
             Checks if a step is possible is each possible direction for a type of piece. if step is not possible, checks for jump.
