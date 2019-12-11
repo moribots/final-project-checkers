@@ -1,0 +1,23 @@
+actions:
+- PickPlace
+authors: ''
+brief: ''
+bugtracker: ''
+depends:
+- catkin
+- actionlib_msgs
+- message_runtime
+- std_msgs
+- smach
+- rospy
+- message_generation
+- cv_bridge
+- moveit
+description: Playing a game of Checkers with a Baxter robot
+license: MIT
+maintainers: mori <mauricerahme2020@u.northwestern.edu>
+msgs: []
+package_type: package
+repo_url: ''
+srvs: []
+url: ''
