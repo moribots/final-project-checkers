@@ -24,7 +24,7 @@ Here is a video of a human-operated game:
 * `roslaunch checkers moveit_motion_plan.launch`
 * In a separate terminal, `rosrun checkers pick_place_as`
 * In a separate terminal, `rosrun checkers smach` (this is the main terminal you will interface with, the others are for debugging and diagnostics)
-* Follow the instructions on the terminal where you opened `smach`, you are ready to play!
+* Follow the instructions on the terminal where you rosran `smach`, you are ready to play!
 
 
 ## Contribution guide (if you are a team member)
