@@ -26,6 +26,8 @@ Here is a video of a human-operated game:
 * In a separate terminal, `rosrun checkers smach` (this is the main terminal you will interface with, the others are for debugging and diagnostics)
 * Follow the instructions on the terminal where you rosran `smach`, you are ready to play!
 
+**VIEWING DOCUMENTATION** (optional)
+
 
 ## Contribution guide (if you are a team member)
 
@@ -50,9 +52,9 @@ When you are ready to push to `upstream` (the shared repo):
 * Once everything works, `git checkout master`, and `git merge <your_personal_branch>`
 * `git push upstream` and `git push origin`
 
-**UPDATING SPHYNX DOCUMENTATION**
+**UPDATING DOCUMENTATION**
 
-**ADDING MORE UNIT TESTS**
+**ADDING UNIT TESTS**
 
 ****
 ## Nodes and Launchfile
