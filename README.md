@@ -20,10 +20,11 @@ Here is a video of a human-operated game:
 * Set up the game table.
 * Plug Baxter's ethernet cable into your computer and connect using a profile as shown in [this guide](https://nu-msr.github.io/me495_site/lecture13_rethink.html).
 * Connect to baxter using ` ROS_MASTER_URI=http://10.42.0.2:11311` and `export ROS_IP=10.42.0.1`.
+* Enable the robot if you would like to manually move the arms first: `rosrun baxter_tools enable_robot.py -e`
 * `roslaunch checkers moveit_motion_plan.launch`
 * In a separate terminal, `rosrun checkers pick_place_as`
 * In a separate terminal, `rosrun checkers smach` (this is the main terminal you will interface with, the others are for debugging and diagnostics)
-* Follow the instructions on the terminal where you opened `smach`, you are ready to play!
+* Follow the instructions on the terminal where you rosran `smach`, you are ready to play!
 
 
 ## Contribution guide (if you are a team member)
