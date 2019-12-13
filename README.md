@@ -98,7 +98,6 @@ The first three goals are actuatied using the `joint_goal` method, while the lat
 ### bridge
 
 ### screen
-<<<<<<< HEAD
 This node subscribes to the `/arm_img` topic to read String messages. In parallel, it also subscribes to `/cameras/right_hand_camera/image` and `/proc_img`, the right and (processed) left arm images of the Baxter robot respectively. If it reads "right", it publishes the former to the topic `/robot/xdisplay` (which Baxter subscribes to in order to show images to its screen), and if it reads "left", it publishes the latter, the processed CV image.
 
 ****
