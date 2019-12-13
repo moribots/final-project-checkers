@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """
-Display right hand camera image on baxter head screen.
+DESCRIPTION: This node publishes either images from right hand camera 
+             or processed images from left hand camera.
 
-PUBLISHERS:
-  + /robot/xdisplay (sensor_msgs/Image) ~ head screen
 
-SUBSCRIBES:
-  + /cameras/right_hand_camera/image (sensor_msgs/Image) ~ right hand camera
+SUBSCRIBERS: Subscribes to the 'arm_img' topic to decide which topic 
+             to subsribe to, whether it is 'cameras/right_hand_camera/image' or 
+             'proc_img' topic.
+
+PUBLISHERS:  'robot/xdisplay' topic which is the head screen.
 
 """
 import rospy
@@ -15,34 +17,44 @@ from std_msgs.msg import String
 
 
 class Display(object):
+    """ The Display Class contains methods
+        to display camera image from either 
+        arm to the head screen
+    """
     def __init__(self):
+        # Initialise arm message
         self.arm = "right"
+        # Right arm subscriber
         self.rsub = rospy.Subscriber('/cameras/right_hand_camera/image',
                                      Image,
                                      self.callback1,
                                      queue_size=1)
+        # Left arm processed image subscriber
         self.lsub = rospy.Subscriber('/proc_img',
                                      Image,
                                      self.callback2,
                                      queue_size=1)
+        # Desicion subscriber
         self.decisionsub = rospy.Subscriber('/arm_img',
                                             String,
                                             self.callback3, queue_size=1)
+        # head screen publisher 
         self.pub = rospy.Publisher('/robot/xdisplay', Image, queue_size=10)
 
     def callback1(self, msg):
+        """Publish right hand image to screen"""
         if self.arm == "right":
-            # print("publishing right arm")
             self.pub.publish(msg)
 
     def callback2(self, msg):
+        """Publish left hand image to screen"""
         if self.arm == "left":
-            # print("publishing left arm")
             self.pub.publish(msg)
 
     def callback3(self, msg):
+        """Getting desicion data"""
         self.arm = msg.data
-        # print(self.arm)
+        
 
 
 def main():
