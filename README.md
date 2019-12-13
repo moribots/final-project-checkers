@@ -101,6 +101,7 @@ The first three goals are actuatied using the `joint_goal` method, while the lat
 ### bridge
 
 ### screen
+This node listens to both right hand camera node and computer vision node. Based on the message from state machine, it will publish different topic to the head screen node and switching between them.
 
 ****
 ## System Architecture
