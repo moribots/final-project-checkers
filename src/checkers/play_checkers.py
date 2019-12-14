@@ -451,10 +451,10 @@ class Board():
                             not_bax = -1
                         if state[r][c] != self.prev_state[r][c]: #board state changed
                             for king in self.enemy_king_list: #loop through enemy kings
-                                print(king)
+                                # print(king)
                                 if state[r][c] == 0 and king == [r,c]: #if a king is no longer where it was
                                     king_move == True # we know its a king's move
-                                    print('king_move')
+                                    # print('king_move')
                                     try:
                                         self.enemy_king_list.remove([r,c]) #the old index for the king is removed
                                         print('enemy: '+str(self.enemy_king_list))
