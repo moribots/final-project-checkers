@@ -110,6 +110,58 @@ class TestAI(unittest.TestCase):
         moves, cap,p = ai.board.get_moves(test_state,ai.board.not_baxter)
         self.assertEquals(len(moves),test_result)
 
+    def test_read_state_pawns(self):
+        ai = CheckersAI()
+        ai.board.baxter_color = 'red'
+        ai.board.not_baxter = 'black'
+        test_state = 'empty empty empty empty empty empty empty empty purple empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty purple empty empty empty empty empty empty empty empty empty empty empty green empty empty empty green empty empty empty empty empty empty green empty empty green empty empty empty empty empty empty empty '
+        test_result = [[ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [-1,  0, -1,  0, -1,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0, -1,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  1,  0,  0,  0,  1,  0],
+                      [ 0,  0,  0,  0,  0,  1,  0,  0],
+                      [ 1,  0,  0,  0,  0,  0,  0,  0]]
+        self.assertEquals(ai.board.world_to_grid(test_state),test_result)
+
+    def test_read_state_pawns(self):
+        ai = CheckersAI()
+        ai.board.baxter_color = 'red'
+        ai.board.not_baxter = 'black'
+        test_state = 'empty empty empty empty empty empty empty empty purple empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty purple empty empty empty empty empty empty empty empty empty empty empty green empty empty empty green empty empty empty empty empty empty green empty empty green empty empty empty empty empty empty empty '
+        test_result = [[ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [-1,  0, -1,  0, -1,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0, -1,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  1,  0,  0,  0,  1,  0],
+                      [ 0,  0,  0,  0,  0,  1,  0,  0],
+                      [ 1,  0,  0,  0,  0,  0,  0,  0]]
+        self.assertEquals(ai.board.world_to_grid(test_state),test_result)
+
+    def test_new_enemy_king(self):
+        ai = CheckersAI()
+        ai.board.baxter_color = 'red'
+        ai.board.not_baxter = 'black'
+        ai.board.prev_state = [[ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [-1,  0, -1,  0, -1,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0, -1,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  1,  0,  0,  0,  1,  0],
+                      [ 0,  0,  0,  0,  0,  -1,  0,  0],
+                      [ 1,  0,  0,  0,  0,  0,  0,  0]]
+        test_state = 'empty empty empty empty empty empty empty empty purple empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty purple empty empty empty empty empty empty empty empty empty empty empty green empty empty empty green empty empty empty empty empty empty green empty empty green empty empty empty empty empty empty empty '
+        test_result = [[ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [-1,  0, -1,  0, -1,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0, -1,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  1,  0,  0,  0,  1,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 1,  0,  0,  0,  0,  0,  -2,  0]]
+        self.assertEquals(ai.board.world_to_grid(test_state),test_result)
 
 
 if __name__ == '__main__':
