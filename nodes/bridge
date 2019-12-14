@@ -1,5 +1,25 @@
 #!/usr/bin/python2
+"""
+DESCRIPTION: This is the computer vision node that works by using findCheckerboardCorners
+             in openCV to create a coordinate system relative to one of four inner
+             corners. Then it projects where it thinks the center of each square is
+             in those new coordinates. Then it looks for each color and finds the center
+             of each contour big enough to be a piece. For each contour, it checks the
+             distance it is from each square in image coordinates, and if it's within a
+             certain tolerance it replaces the 'empty' default status to that piece's color
+             ('green' or 'purple'). The output is a string of 64 words, separated by spaces,
+             telling the status of every square in that frame.
 
+SUBSCRIBERS: Subscribes to /cameras/lef_hand_camera/image, which is the image from
+             baxter's left hand.
+
+
+PUBLISHERS:  Publishes to Board_state, which is a string message represnting each square
+             of the board and whether it is empty or the color of the player's piece.
+
+             Also publishes to proc_img, which is the cropped and augmented image after
+             it is processed through openCV.  This is meant to be displayed on baxter's monitor.
+"""
 import rospy
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
@@ -21,6 +41,8 @@ class Vision():
 
         # Publish a string to represent board state
         self.pub2 = rospy.Publisher('Board_State', String, queue_size=1)
+
+        # Publish cropped and processed image to baxter's monitor
         self.pub3 = rospy.Publisher('proc_img', Image, queue_size=1)
 
         # square width 43.5mm
@@ -51,7 +73,7 @@ class Vision():
         # Termination self.criteria
         self.criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-        # Values found from camera_calibration.py
+        # Values found from camera_calibration.py in scripts directory
         self.mtx = np.float32([[398.4915333,   0,         634.76045953],
                           [  0,         396.31101195, 412.90426599],
                           [  0,            0,           1         ]])
@@ -243,37 +265,37 @@ class Vision():
             # Calculate distance to available board squares
             min_distance_list_blue = []
             for point in checkers_impgpts_blue:
-                distance_list = []
+                ##distance_list = []
                 for point2 in board_imgpts:
                     point3 = point2[0]
                     distance = math.sqrt( ((point[0] - point3[0])**2) + ((point[1] - point3[1])**2))
-                    distance_list.append(distance)
+                    ##distance_list.append(distance)
                     if distance < MIN_IMGPNT_DIST:
                         index = np.where(board_imgpts == point2)
 
                         ##if not [self.board_dict[index[0][0]], 'blue'] in board_state:
                         # Output index of board position to board state lists
-                        board_state.append([self.board_dict[index[0][0]], 'blue'])
+                        ##board_state.append([self.board_dict[index[0][0]], 'blue'])
                         board_state2[index[0][0]] = 'green'
                         break
                 min_distance_list_blue.append(min(distance_list))
 
             # Calculate distance to available board squares
-            min_distance_list_red = []
+            ##min_distance_list_red = []
             for point in checkers_impgpts_red:
-                distance_list = []
+                ##distance_list = []
                 for point2 in board_imgpts:
                     point2 = point2[0]
                     distance = math.sqrt( ((point[0] - point2[0])**2) + ((point[1] - point2[1])**2))
-                    distance_list.append(distance)
+                    ##distance_list.append(distance)
                     if distance < MIN_IMGPNT_DIST:
                         index = np.where(board_imgpts == point2)
 
                         # Output index of board position to board state lists
-                        board_state.append([self.board_dict[index[0][0]], 'red'])
+                        ##board_state.append([self.board_dict[index[0][0]], 'red'])
                         board_state2[index[0][0]] = 'purple'
                         break
-                min_distance_list_red.append(min(distance_list))
+                ##min_distance_list_red.append(min(distance_list))
 
             # Draw the origin
             frame = self.draw_origin(frame,corners2,axis_imgpts)
@@ -287,6 +309,8 @@ class Vision():
             print('boardstate3')
             print(board_state3)
             self.pub2.publish(board_state3)
+
+            # Crop and process frame to publish to baxter's monitor
             cropframe = frame[300:650, 350:945]
             cropframe = cv2.resize(cropframe, (1024, 600))
             pubframe = self.bridge.cv2_to_imgmsg(cropframe, encoding="passthrough")

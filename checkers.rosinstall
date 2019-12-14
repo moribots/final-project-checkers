@@ -1,6 +1,14 @@
 - git:
     local-name: checkers
-    uri: git@github.com:moribots/final-project-checkers.git
+    uri: https://github.com/ME495-EmbeddedSystems/final-project-checkers.git
 - git:
     local-name: moveit_robots
     uri: git@github.com:moribots/moveit_robots.git
+- git:
+    local-name: baxter_interface
+    uri: https://github.com/RethinkRobotics/baxter_interface.git
+    version: release-1.2.0
+- git:
+    local-name: baxter_tools
+    uri: https://github.com/RethinkRobotics/baxter_tools.git
+    version: release-1.2.0

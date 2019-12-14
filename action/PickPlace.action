@@ -1,16 +1,22 @@
 # Goal
-# A two-element 2D list containing the pick and place (x, y) coordinates respectively
-# e.g [[0.0, 0.0], [1.0, 1.0]]
+# A two-element list containing the pick (x, y) coordinates
+# e.g [0.0, 0.0]
 float32[] pick_goal
+# A two-element list containing the place (x, y) coordinates
+# e.g [0.0, 0.0]
 float32[] place_goal
+# If True, sends the right arm to a preset home position in the joint space.
 bool home
+# If True, saves the left arm end-effector coordinates and performs calibration routine using right arm.
 bool calibrate
+# If True, sends the left arm to a preset view position in the joint space.
 bool camera_view
+# If True, sends the left arm to a preset home position in the joint space.
 bool camera_home
 
 ---
 # Result
-# Whether the action has succeeded or compromised
+# Whether the action has succeeded or been compromised
 string status
 
 ---
