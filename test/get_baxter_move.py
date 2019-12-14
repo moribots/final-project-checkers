@@ -126,6 +126,7 @@ class TestAI(unittest.TestCase):
         self.assertEquals(ai.board.world_to_grid(test_state),test_result)
 
     def test_read_state_pawns(self):
+        '''Test that world_to_grid function reads in CV input corretly'''
         ai = CheckersAI()
         ai.board.baxter_color = 'red'
         ai.board.not_baxter = 'black'
@@ -141,6 +142,7 @@ class TestAI(unittest.TestCase):
         self.assertEquals(ai.board.world_to_grid(test_state),test_result)
 
     def test_new_enemy_king(self):
+        '''Checks that oppponets kings will be recognized when they become kings'''
         ai = CheckersAI()
         ai.board.baxter_color = 'red'
         ai.board.not_baxter = 'black'
@@ -152,7 +154,7 @@ class TestAI(unittest.TestCase):
                       [ 0,  0,  1,  0,  0,  0,  1,  0],
                       [ 0,  0,  0,  0,  0,  -1,  0,  0],
                       [ 1,  0,  0,  0,  0,  0,  0,  0]]
-        test_state = 'empty empty empty empty empty empty empty empty purple empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty purple empty empty empty empty empty empty empty empty empty empty empty green empty empty empty green empty empty empty empty empty empty green empty empty green empty empty empty empty empty empty empty '
+        test_state = 'empty empty empty empty empty empty empty empty purple empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty purple empty empty empty empty empty empty empty empty empty empty empty green empty empty empty green empty empty empty empty empty empty empty empty empty green empty empty empty empty empty purple empty '
         test_result = [[ 0,  0,  0,  0,  0,  0,  0,  0],
                       [-1,  0, -1,  0, -1,  0,  0,  0],
                       [ 0,  0,  0,  0,  0,  0,  0,  0],
@@ -161,6 +163,32 @@ class TestAI(unittest.TestCase):
                       [ 0,  0,  1,  0,  0,  0,  1,  0],
                       [ 0,  0,  0,  0,  0,  0,  0,  0],
                       [ 1,  0,  0,  0,  0,  0,  -2,  0]]
+        self.assertEquals(ai.board.world_to_grid(test_state),test_result)
+
+    def test_enemy_king_move(self):
+        '''Tests that exiting kings for both players are tracked correctly'''
+        ai = CheckersAI()
+        ai.board.baxter_color = 'red'
+        ai.board.not_baxter = 'black'
+        ai.board.bax_king_list = [[5,2]]
+        ai.board.enemy_king_list = [[6,5]]
+        ai.board.prev_state = [[ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [-1,  0, -1,  0, -1,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0, -1,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  2,  0,  0,  0,  1,  0],
+                      [ 0,  0,  0,  0,  0, -2,  0,  0],
+                      [ 1,  0,  0,  0,  0,  0,  0,  0]]
+        test_state = 'empty empty empty empty empty empty empty empty purple empty purple empty purple empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty empty purple empty empty empty empty empty empty empty empty empty empty empty green empty purple empty green empty empty empty empty empty empty empty empty empty green empty empty empty empty empty empty empty '
+        test_result = [[ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [-1,  0, -1,  0, -1,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  0,  0,  0,  0, -1,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 0,  0,  2,  0, -2,  0,  1,  0],
+                      [ 0,  0,  0,  0,  0,  0,  0,  0],
+                      [ 1,  0,  0,  0,  0,  0,  0,  0]]
         self.assertEquals(ai.board.world_to_grid(test_state),test_result)
 
 
