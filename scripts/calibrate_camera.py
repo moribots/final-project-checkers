@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""
+DESCRIPTION: This script is for finding the calibration matrices of a camera.
+             It simply prints the these to the screen as well as the size of the image.
+             In order to properly calibrate the camera, you need to load at least
+             ten images of the board from different angles.  Once you run this script
+             once, you can simply save the matrices for use in other code.
+"""
 import numpy as np
 import cv2
 import glob
@@ -17,7 +24,7 @@ objp[:,:2] = np.mgrid[0:7,0:7].T.reshape(-1,2)
 objpoints = [] # 3d point in real world space
 imgpoints = [] # 2d points in image plane.
 
-images = glob.glob('board*.jpg')
+images = glob.glob('bax*.jpg')
 print(images)
 
 
