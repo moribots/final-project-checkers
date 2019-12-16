@@ -4,7 +4,7 @@
 ## Project Overview
 This ROS Melodic package allows a Baxter robot to play checkers using the modern ruleset! You have a choice to play using our custom checkers AI, or against a human-operated Baxter robot. This project was completing as part of the final project requirement for ME495: Embedded Systems in Robotics taught by Prof. Matthew Elwin. This project placed 1st in the judged competition between a total of 6 project teams. The theme for this year's competition was recreational robotics, and the other teams' projects were: Terminator (a nerf-gun shooting robot), Mini-Golf, Cornhole, Tic-Tac-Toe and MegaBLOKS.
 
-Here is a video of an AI-operated game:
+Here is a video of an AI-operated game (Sped up 6x):
 
 [![Watch the video](media/yt_thumb.png)](https://youtu.be/6ZOXy3TKYeM)
 

@@ -167,13 +167,10 @@ include_directories(
 install(PROGRAMS
    #   scripts/my_python_script
    nodes/bridge
-   nodes/get_baxter_move
-   nodes/moveit_motion_plan
    nodes/pickplace_as
    nodes/screen
    nodes/smach
    nodes/take_turn
-   nodes/vision
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
